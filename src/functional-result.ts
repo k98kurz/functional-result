@@ -298,6 +298,41 @@ async function tryCatch<T, E = unknown>(
 }
 
 /**
+ * Wraps a function in a try-catch block, returning a Result.
+ * Sync-only version of tryCatch; cannot use async within it.
+ *
+ * Example: `const result = tryCatchSync(() => 123)` (no `await`)
+ *
+ * @template T - Return type of the function
+ * @template E - Error type (defaults to unknown without a transformer)
+ * @param fn - Function to wrap (sync only)
+ * @param [errorTransformer] - Function to transform caught errors
+ * @returns Result
+ */
+function tryCatchSync<T>(fn: () => T): Result<T, unknown>;
+function tryCatchSync<T, E>(
+  fn: () => T,
+  errorTransformer: (error: unknown) => E
+): Result<T, E>;
+
+function tryCatchSync<T, E = unknown>(
+  fn: () => T,
+  errorTransformer?: (error: unknown) => E
+): Result<T, E> {
+  try {
+    const data = fn();
+    if (data instanceof Promise)
+      throw new Error('tryCatchSync received a Promise - use tryCatch instead');
+    return success<T, E>(data);
+  } catch (error) {
+    const transformedError = errorTransformer
+      ? errorTransformer(error)
+      : (error as E);
+    return failure<T, E>(transformedError);
+  }
+}
+
+/**
  * Extracts the success value or returns a default value.
  * Curried function: first takes default value, then the Result.
  * @template T - Success type
@@ -469,6 +504,7 @@ export {
   isSuccess,
   isFailure,
   tryCatch,
+  tryCatchSync,
   getOrElse,
   getOrThrow,
   unwrapResult,

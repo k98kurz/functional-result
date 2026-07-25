@@ -4,15 +4,15 @@ description: >
   Functional error handling with the Result type. Use when you need to chain
   operations that may fail, collect validation errors, convert exception-based
   code to explicit error handling, or work with typed success/failure paths in
-  TypeScript. Provides map, chain, pipe, tryCatch, validate, sequence,
-  traverse, tap, tapError, and match/fold for composable error handling.
+  TypeScript. Provides map, chain, pipe, tryCatch, tryCatchSync, validate,
+  sequence, traverse, tap, tapError, and match/fold for composable error handling.
 license: ISC
 compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
-  version: 0.0.1
-  last-updated: 2026-07-08
+  version: 0.0.2
+  last-updated: 2026-07-24
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
@@ -138,10 +138,13 @@ const failed = await pipe(
 
 ### Pattern 1: Wrap existing code with tryCatch
 
-```typescript
-import { tryCatch } from '@k98kurz/functional-result';
+Use `tryCatch` for operations that may be async or sync. For synchronous-only
+operations where you want to avoid Promise overhead, use `tryCatchSync`:
 
-// Wraps both sync and async operations
+```typescript
+import { tryCatch, tryCatchSync } from '@k98kurz/functional-result';
+
+// Wrap both async and sync operations with tryCatch
 const fetchData = async () =>
   await tryCatch(async () => {
     const response = await fetch('https://api.example.com');
@@ -151,9 +154,13 @@ const fetchData = async () =>
 const parseJson = async (json: string) =>
   await tryCatch(() => JSON.parse(json));
 
+// Wrap sync operations with tryCatchSync (returns Result directly, no await)
+const parseJsonSync = (json: string) =>
+  tryCatchSync(() => JSON.parse(json));
+
 // Provide a transformer for richer error context
-const safeParse = async (json: string) =>
-  await tryCatch(
+const safeParse = (json: string) =>
+  tryCatchSync(
     () => JSON.parse(json),
     (error) => ({
       type: 'parse_error',
@@ -398,6 +405,7 @@ if (isFailure(result)) {
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
 - **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
+- **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
 - **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
 - **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures

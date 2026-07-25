@@ -10,7 +10,7 @@ failures. Promotes a functional style of error handling and pipelining of operat
 - Pattern matching with match, fold, and getOrElse for handling both outcomes
 - Array operations including sequence, traverse, and partitionResults
 - Validation support for collecting multiple errors
-- Interoperability between Result-based and exception-based code via tryCatch and unwrapResult
+- Interoperability between Result-based and exception-based code via tryCatch, tryCatchSync, and unwrapResult
 - Side-effect operations (tap, tapError) for logging and debugging inside pipelines
 - Type guards (isSuccess, isFailure) for TypeScript type narrowing
 
@@ -301,11 +301,12 @@ const invalid = emailValidator('ab');
 
 ### Error Handling and Interoperability
 
-This library provides two main functions (and one alias) for interoperability
+This library provides three main functions (and one alias) for interoperability
 between the two error handling paradigms:
-
 - `tryCatch` allows wrapping a function that may throw, with an optional error
   transformer function to transform any caught error
+- `tryCatchSync` allows wrapping synchronous functions that may throw, with an
+  optional error transformer function (no async/await; returns Result directly)
 - `unwrapResult` extracts the data from a Result, throwing the error for failures
 - `getOrThrow` is an alias for `unwrapResult`
 
@@ -313,7 +314,7 @@ between the two error handling paradigms:
 
 The `tryCatch` function wraps both synchronous and asynchronous operations,
 providing a unified interface for error handling. This makes it easy to integrate
-existing code that uses exceptions:
+existing code that uses exceptions. However, it must be used with `await`:
 
 ```typescript
 import { tryCatch } from '@k98kurz/functional-result';
@@ -338,6 +339,35 @@ const result = await tryCatch(
   (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
 );
 ```
+
+#### Synchronous Error Handling
+
+The `tryCatchSync` function is a sync-only version of `tryCatch` that returns a
+`Result` directly (no async/Promise). Use it when you know the operation is
+synchronous and want to avoid the overhead of `Promise` wrapping, or when you
+can't use `await`:
+
+```typescript
+import { tryCatchSync } from '@k98kurz/functional-result';
+
+// Wrap synchronous operations (no await needed)
+const syncResult = tryCatchSync(() => {
+  const data = JSON.parse('{"valid": true}');
+  return data.valid;
+});
+// { success: true, data: true }
+
+// Transform errors for better context
+const result = tryCatchSync(
+  () => sometimesThrows(),
+  (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
+);
+```
+
+**Important**: `tryCatchSync` is for synchronous operations only. If you need to
+handle async operations, use `tryCatch` instead. Attempting to use async functions
+within `tryCatchSync` will return a failure with an error message: "tryCatchSync
+received a Promise - use tryCatch instead".
 
 #### Exiting the Result Type Paradigm
 
@@ -379,7 +409,7 @@ This allows gradual migration from exception-based to Result-based code:
 
 #### Type Guards
 
-Use type guards to narrow Result types:
+Use type guards to narrow Result types for imperative style:
 
 ```typescript
 import { isSuccess, isFailure } from '@k98kurz/functional-result';

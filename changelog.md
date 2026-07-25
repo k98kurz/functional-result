@@ -1,3 +1,8 @@
+## 0.0.2
+
+- Added `tryCatchSync` function for synchronous-only error handling
+- Updated documentation with `tryCatchSync` examples and usage guidance
+
 ## 0.0.1
 
 - Initial release

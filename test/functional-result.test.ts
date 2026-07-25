@@ -14,6 +14,7 @@ import {
   isSuccess,
   isFailure,
   tryCatch,
+  tryCatchSync,
   getOrElse,
   getOrThrow,
   pipe,
@@ -159,6 +160,68 @@ describe('Error Handling', () => {
     });
     expect(result.success).toBe(false);
     expect(result.error).toBe('string error');
+  });
+
+  it('[E10] tryCatchSync handles successful sync operations', () => {
+    const result = tryCatchSync(() => 'success');
+    expect(result.success).toBe(true);
+    expect(result.data).toBe('success');
+  });
+
+  it('[E11] tryCatchSync handles sync errors via transformer', () => {
+    const originalError = new Error('test error');
+    const result = tryCatchSync<string, string>(
+      () => {
+        throw originalError;
+      },
+      error =>
+        `transformed: ${error instanceof Error ? error.message : String(error)}`
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('transformed: test error');
+  });
+
+  it('[E12] tryCatchSync transforms errors with a custom transformer', () => {
+    const originalError = new Error('test error');
+    const result = tryCatchSync(
+      () => {
+        throw originalError;
+      },
+      (error: unknown) => `caught: ${(error as Error).message}`
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('caught: test error');
+  });
+
+  it('[E13] tryCatchSync handles sync functions with type params', () => {
+    const result = tryCatchSync(() => 'sync result');
+    expect(result.success).toBe(true);
+    expect(result.data).toBe('sync result');
+  });
+
+  it('[E14] tryCatchSync preserves original error w/o transformer', () => {
+    const customError = { code: 'CUSTOM', message: 'custom error' };
+    const result = tryCatchSync(() => {
+      throw customError;
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(customError);
+  });
+
+  it('[E15] tryCatchSync handles unknown error types safely', () => {
+    const result = tryCatchSync(() => {
+      throw 'string error';
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('string error');
+  });
+
+  it('[E16] tryCatchSync throws when passed an async function', () => {
+    const result = tryCatchSync(async () => 'async result');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatchObject({
+      message: 'tryCatchSync received a Promise - use tryCatch instead',
+    });
   });
 });
 
