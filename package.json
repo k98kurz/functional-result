@@ -1,6 +1,6 @@
 {
   "name": "@k98kurz/functional-result",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TypeScript library for handling Results and chaining operations.",
   "main": "dist/functional-result.js",
   "type": "module",

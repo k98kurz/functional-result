@@ -11,8 +11,8 @@ compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
-  version: 0.0.2
-  last-updated: 2026-07-24
+  version: "0.0.2"
+  last-updated: "2026-08-15"
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
@@ -410,8 +410,9 @@ if (isFailure(result)) {
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
 - **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures
 - **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values)
-- **Error propagation**: Once a failure occurs in a pipe, all subsequent operations are skipped
+- **Error propagation**: `pipe` invokes every operation even after a failure — `map`/`chain`/`tap` no-op on a failed Result (while `mapError`/`tapError` still run), which makes steps *appear* skipped
 - **Default error type**: If you don't specify the error type, it defaults to `unknown`
+- **Do NOT nest pipes**: nested calls bypass the typed overloads (ops degrade to `Result<any, E>`) and add needless Promise layers; to carry multiple values across steps, thread a state object (e.g. `{ user, orders }`) — use `map` to update it and `chain` for fallible steps
 
 ## Common templates
 

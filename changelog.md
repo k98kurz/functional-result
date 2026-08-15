@@ -1,3 +1,7 @@
+## 0.0.3
+
+- Improved bundled skill file to document an avoidable anti-pattern
+
 ## 0.0.2
 
 - Added `tryCatchSync` function for synchronous-only error handling

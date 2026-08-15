@@ -1,5 +1,18 @@
 # Memory
 
+## Read tool truncates large windows in long source files
+
+**Gotcha (2026-08-15):** The agent's file-read tool silently truncates large
+windows when reading deep into long files — e.g., reading
+`src/functional-result.ts` (512 lines) at `offset 360, limit 160` consistently
+stopped at line 401, below the requested range. This caused many repeated
+failed attempts to inspect the `pipe` implementation (~lines 474–486).
+
+**Solution:** When reading past ~line 400 of any long file in this repo
+(`src/functional-result.ts`, `src/SKILL.md`, both 500+ lines), request small
+windows (`limit` ≤ 50). Grep for line numbers first, then read the narrow span
+around them.
+
 ## tsconfig scope and typecheck
 
 **Decision (v0.0.1):** `tsconfig.json` restricts `include` to `["src"]` so
