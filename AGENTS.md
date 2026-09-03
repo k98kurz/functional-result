@@ -23,7 +23,15 @@ a human.
 # Memory
 
 Major architectural decisions, best practices, and other things worth remembering
-long-term are stored in docs/memory.md.
+long-term are stored in docs/memory.md. All entries must be actionable, not merely
+a historical record of churn.
+
+# Changelog
+
+`changelog.md` contains information useful for Component consumers, particularly
+for updating versions of the library. This is NOT a graveyard for maintainer code
+churn entries. No internal/maintainer-relevant information should be preserved here.
+The format should be easy to scan and read for consumers of this library.
 
 # Discovery of Development Practices
 

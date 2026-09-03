@@ -6,15 +6,15 @@
 `(() => T) | (() => Promise<T>)` bound `T = Promise<X>` for promise-returning
 thunks (TypeScript breaks inference ties toward the first union constituent),
 typing `.data` as a `Promise` while the runtime correctly awaited to `X`. It
-survived unnoticed because tests are excluded from type checking (see
-"tsconfig scope and typecheck" above) and Vitest doesn't typecheck.
+survived unnoticed because tests were then excluded from type checking (see
+"tsconfig scope and typecheck" below) and Vitest doesn't typecheck.
 
 **Solution:** Ordered overloads with the async signature first — overload
 resolution is a documented first-match-wins rule, unlike union inference
-tie-breaking. A type-level probe is kept in `temp/probe.ts`; run it with
-explicit-file `tsc` flags (`tsconfig.json` only includes `src`) whenever
-touching public generics. Consider `Awaited<T>` if a signature ever needs to
-normalize promise-or-value returns by construction.
+tie-breaking. When touching public generics, verify signatures with a
+throwaway type-level probe run with explicit-file `tsc` flags
+(`tsconfig.json` only includes `src`). Consider `Awaited<T>` if a signature
+ever needs to normalize promise-or-value returns by construction.
 
 ## Read tool truncates large windows in long source files
 
@@ -31,19 +31,18 @@ around them.
 
 ## tsconfig scope and typecheck
 
-**Decision (v0.0.1):** `tsconfig.json` restricts `include` to `["src"]` so
-`tsc --noEmit` only checks library code. Test files are excluded from type
-checking because they access `.data`/`.error` on `Result` unions without
-narrowing (Vitest handles type checking at runtime via the test runner).
+**Decision (revised 2026-09-02):** Tests are type-checked. `tsconfig.json`
+covers `src` only; `tsconfig.test.json` covers `test/**/*.ts`; `npm run
+typecheck` runs both. Reversed from the v0.0.1 exclusion after the unchecked
+`tryCatch` inference bug (entry above) survived unnoticed — Vitest transpiles
+without `tsc`.
 
-**Why not fix test types:**
-- Tests work correctly at runtime — the discriminated union properties exist
-- Fixing ~55 type errors would require widespread use of `isSuccess`/`isFailure`
-  guards or type assertions, making tests harder to read
-- Vitest transpiles and runs tests without `tsc`
-
-**Build config** (`tsconfig.core.json`) extends the base and adds explicit
-`rootDir: "src"` for correct output structure.
+**Test narrowing conventions:**
+- Success paths: `expect(unwrapResult(result)).toBe(...)` — a test-local helper
+  (`if (!isSuccess(r)) throw ...; return r.data`) in `functional-result.test.ts`.
+- Failure paths: `expect(isFailure(result)).toBe(true);` then
+  `if (!isFailure(result)) return;` before reading `result.error`. The assertion
+  records intent; the guard drives control-flow narrowing for the type checker.
 
 ## JSDoc checker Node version compatibility
 
@@ -55,11 +54,7 @@ Node 22.
 ## Test tag convention (v0.0.1)
 
 **Decision:** Adopted single-letter test tags to identify which block a test
-belongs to.
-
-### Why
-
-Test tags like `[P05]` are the stable anchor for locating tests — they appear in
+belongs to. Tags like `[P05]` are the stable anchor for locating tests in
 error messages, bug reports, and CI output even as test names or `describe`
 blocks are renamed.
 
@@ -76,19 +71,6 @@ blocks are renamed.
 | Accessors | **A** | A01–A02 | `getOrElse`, `getOrThrow` — renamed from "Extraction" |
 | Edge Cases | **X** | X01–X04 | **X** for eXtreme / eXceptional |
 | Skill Export | **S** | S01–S07 | **S**kill export CLI tests |
-
-### Criteria
-
-- **Unique:** No collisions between prefixes
-- **Stable:** Prefix remains meaningful if a block is renamed later
-- **Mnemonic:** Prefix hints at the block content
-- **Compact:** Single letter for easy scanning
-- **Orderable:** Numerical suffix pinpoints position within a block
-
-### Future
-
-If the library test suite grows sufficiently, two-letter prefixes (e.g., `CT`,
-`EH`, `TR`, `CP`, `CL`, `VL`, `AC`, `EC`, `SE`) will scale without ambiguity.
 
 ## JSDoc formatting conventions
 

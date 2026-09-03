@@ -1,6 +1,6 @@
 {
   "name": "@k98kurz/functional-result",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "TypeScript library for handling Results and chaining operations.",
   "main": "dist/functional-result.js",
   "type": "module",
@@ -33,12 +33,14 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" && node scripts/check-jsdoc-lines.mjs",
     "check:jsdoc": "node scripts/check-jsdoc-lines.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck:src": "tsc --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "publish:npm": "npm publish",
     "publish:github": "npm publish --registry https://npm.pkg.github.com",
-    "prepublishOnly": "npm run build && npm run test:dist"
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test:dist"
   },
   "repository": {
     "type": "git",
@@ -72,6 +74,7 @@
   "license": "ISC",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@types/node": "^20.11.28",
     "@vitest/coverage-v8": "^3.2.6",
     "eslint": "^9.0.0",
     "prettier": "^3.5.0",

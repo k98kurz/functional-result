@@ -23,18 +23,26 @@ import {
   type Result,
 } from '../src/functional-result';
 
+function unwrapResult<T, E>(result: Result<T, E>): T {
+  if (!isSuccess(result)) {
+    throw new Error('Expected a success Result, but got a failure');
+  }
+  return result.data;
+}
+
 describe('Basics: Constructors & Type Guards', () => {
   it('[B01] creates success result with correct type', () => {
     const result = success<number, unknown>(42);
     expect(result.success).toBe(true);
     expect(isSuccess(result)).toBe(true);
-    expect(result.data).toBe(42);
+    expect(unwrapResult(result)).toBe(42);
   });
 
   it('[B02] creates failure result with correct type', () => {
     const result = failure<never, string>('error');
     expect(result.success).toBe(false);
     expect(isFailure(result)).toBe(true);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('error');
   });
 
@@ -42,8 +50,9 @@ describe('Basics: Constructors & Type Guards', () => {
     const successResult = success<string, never>('hello');
     const failureResult = failure<never, number>(404);
     expect(successResult.success).toBe(true);
-    expect(typeof successResult.data).toBe('string');
+    expect(typeof unwrapResult(successResult)).toBe('string');
     expect(failureResult.success).toBe(false);
+    if (!isFailure(failureResult)) return;
     expect(typeof failureResult.error).toBe('number');
   });
 
@@ -76,9 +85,10 @@ describe('Basics: Constructors & Type Guards', () => {
     }))(userResult);
 
     expect(transformed.success).toBe(true);
-    expect(transformed.data.id).toBe(1);
-    expect(transformed.data.name).toBe('test');
-    expect(transformed.data.email).toBe('test@example.com');
+    const transformedData = unwrapResult(transformed);
+    expect(transformedData.id).toBe(1);
+    expect(transformedData.name).toBe('test');
+    expect(transformedData.email).toBe('test@example.com');
   });
 });
 
@@ -86,7 +96,7 @@ describe('Error Handling', () => {
   it('[E01] tryCatch handles successful async operations', async () => {
     const result = await tryCatch(async () => 'success');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('success');
+    expect(unwrapResult(result)).toBe('success');
   });
 
   it('[E02] tryCatch handles async errors via transformer', async () => {
@@ -99,19 +109,20 @@ describe('Error Handling', () => {
         `transformed: ${error instanceof Error ? error.message : String(error)}`
     );
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('transformed: test error');
   });
 
   it('[E03] tryCatch handles sync operations', async () => {
     const result = await tryCatch(() => 'sync result');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('sync result');
+    expect(unwrapResult(result)).toBe('sync result');
   });
 
   it('[E04] tryCatch handles async operations', async () => {
     const result = await tryCatch(async () => 'async result');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('async result');
+    expect(unwrapResult(result)).toBe('async result');
   });
 
   it('[E05] tryCatch transforms errors with a custom transformer', async () => {
@@ -123,13 +134,14 @@ describe('Error Handling', () => {
       (error: unknown) => `caught: ${(error as Error).message}`
     );
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('caught: test error');
   });
 
   it('[E06] tryCatch handles sync functions with type params', async () => {
     const result = await tryCatch(() => 'sync result');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('sync result');
+    expect(unwrapResult(result)).toBe('sync result');
   });
 
   it('[E07] tryCatch handles sync and async functions uniformly', async () => {
@@ -140,9 +152,9 @@ describe('Error Handling', () => {
     const asyncResult = await tryCatch(asyncFn);
 
     expect(syncResult.success).toBe(true);
-    expect(syncResult.data).toBe('sync');
+    expect(unwrapResult(syncResult)).toBe('sync');
     expect(asyncResult.success).toBe(true);
-    expect(asyncResult.data).toBe('async');
+    expect(unwrapResult(asyncResult)).toBe('async');
   });
 
   it('[E08] tryCatch preserves original error w/o transformer', async () => {
@@ -151,6 +163,7 @@ describe('Error Handling', () => {
       throw customError;
     });
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe(customError);
   });
 
@@ -159,13 +172,14 @@ describe('Error Handling', () => {
       throw 'string error';
     });
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('string error');
   });
 
   it('[E10] tryCatchSync handles successful sync operations', () => {
     const result = tryCatchSync(() => 'success');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('success');
+    expect(unwrapResult(result)).toBe('success');
   });
 
   it('[E11] tryCatchSync handles sync errors via transformer', () => {
@@ -178,6 +192,7 @@ describe('Error Handling', () => {
         `transformed: ${error instanceof Error ? error.message : String(error)}`
     );
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('transformed: test error');
   });
 
@@ -190,13 +205,14 @@ describe('Error Handling', () => {
       (error: unknown) => `caught: ${(error as Error).message}`
     );
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('caught: test error');
   });
 
   it('[E13] tryCatchSync handles sync functions with type params', () => {
     const result = tryCatchSync(() => 'sync result');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('sync result');
+    expect(unwrapResult(result)).toBe('sync result');
   });
 
   it('[E14] tryCatchSync preserves original error w/o transformer', () => {
@@ -205,6 +221,7 @@ describe('Error Handling', () => {
       throw customError;
     });
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe(customError);
   });
 
@@ -213,12 +230,14 @@ describe('Error Handling', () => {
       throw 'string error';
     });
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('string error');
   });
 
   it('[E16] tryCatchSync throws when passed an async function', () => {
     const result = tryCatchSync(async () => 'async result');
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toMatchObject({
       message: 'tryCatchSync received a Promise - use tryCatch instead',
     });
@@ -234,8 +253,9 @@ describe('Transformations', () => {
     const preservedFailure = map((x: number) => x * 2)(failureResult);
 
     expect(doubled.success).toBe(true);
-    expect(doubled.data).toBe(10);
+    expect(unwrapResult(doubled)).toBe(10);
     expect(preservedFailure.success).toBe(false);
+    if (!isFailure(preservedFailure)) return;
     expect(preservedFailure.error).toBe('error');
   });
 
@@ -247,8 +267,9 @@ describe('Transformations', () => {
     const chainedFailure = chain((x: number) => success(x * 3))(failureResult);
 
     expect(chained.success).toBe(true);
-    expect(chained.data).toBe(15);
+    expect(unwrapResult(chained)).toBe(15);
     expect(chainedFailure.success).toBe(false);
+    if (!isFailure(chainedFailure)) return;
     expect(chainedFailure.error).toBe('error');
   });
 
@@ -315,8 +336,9 @@ describe('Transformations', () => {
     );
 
     expect(mappedSuccess.success).toBe(true);
-    expect(mappedSuccess.data).toBe(42);
+    expect(unwrapResult(mappedSuccess)).toBe(42);
     expect(mappedFailure.success).toBe(false);
+    if (!isFailure(mappedFailure)) return;
     expect(mappedFailure.error).toBe('ERROR');
   });
 
@@ -326,6 +348,7 @@ describe('Transformations', () => {
     const transformed = mapError((e: string) => `error: ${e}`)(result);
 
     expect(transformed.success).toBe(false);
+    if (!isFailure(transformed)) return;
     expect(transformed.error).toBe('error: not found');
   });
 
@@ -343,8 +366,9 @@ describe('Transformations', () => {
 
     expect(sideEffects).toEqual([42]);
     expect(tappedSuccess.success).toBe(true);
-    expect(tappedSuccess.data).toBe(42);
+    expect(unwrapResult(tappedSuccess)).toBe(42);
     expect(tappedFailure.success).toBe(false);
+    if (!isFailure(tappedFailure)) return;
     expect(tappedFailure.error).toBe('error');
   });
 
@@ -362,8 +386,9 @@ describe('Transformations', () => {
 
     expect(sideEffects).toEqual(['error']);
     expect(tappedSuccess.success).toBe(true);
-    expect(tappedSuccess.data).toBe(42);
+    expect(unwrapResult(tappedSuccess)).toBe(42);
     expect(tappedFailure.success).toBe(false);
+    if (!isFailure(tappedFailure)) return;
     expect(tappedFailure.error).toBe('error');
   });
 
@@ -378,7 +403,7 @@ describe('Transformations', () => {
 
     expect(sideEffects).toEqual([5]);
     expect(mapped.success).toBe(true);
-    expect(mapped.data).toBe(10);
+    expect(unwrapResult(mapped)).toBe(10);
   });
 
   it('[T11] tapError composes with mapError and side effects', () => {
@@ -392,6 +417,7 @@ describe('Transformations', () => {
 
     expect(sideEffects).toEqual(['oops']);
     expect(mapped.success).toBe(false);
+    if (!isFailure(mapped)) return;
     expect(mapped.error).toBe('OOPS');
   });
 });
@@ -404,7 +430,7 @@ describe('Composition', () => {
       chain((x: number) => success<string, string>(x.toString()))
     );
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10');
+    expect(unwrapResult(result)).toBe('10');
   });
 
   it('[P02] pipe maintains type safety throughout chain', async () => {
@@ -415,7 +441,7 @@ describe('Composition', () => {
       map((s: string) => `${s}_processed`)
     );
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10_processed');
+    expect(unwrapResult(result)).toBe('10_processed');
   });
 
   it('[P03] pipe handles point-free style', async () => {
@@ -424,7 +450,7 @@ describe('Composition', () => {
 
     const result = await pipe(success<number, string>(5), double, toString);
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10');
+    expect(unwrapResult(result)).toBe('10');
   });
 
   it('[P04] curried functions work independently', () => {
@@ -435,7 +461,7 @@ describe('Composition', () => {
     const stringified = toString(doubled);
 
     expect(stringified.success).toBe(true);
-    expect(stringified.data).toBe('10');
+    expect(unwrapResult(stringified)).toBe('10');
   });
 
   it('[P05] pipe maintains type safety with inferred types', async () => {
@@ -446,7 +472,7 @@ describe('Composition', () => {
       map(s => `${s}_processed`)
     );
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10_processed');
+    expect(unwrapResult(result)).toBe('10_processed');
   });
 
   it('[P06] pipe handles point-free style with inferred types', async () => {
@@ -455,7 +481,7 @@ describe('Composition', () => {
 
     const result = await pipe(success(5), double, toString);
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10');
+    expect(unwrapResult(result)).toBe('10');
   });
 
   it('[P07] pipe handles empty operations array', async () => {
@@ -472,7 +498,7 @@ describe('Composition', () => {
       map((s: string) => `${s}_async`)
     );
     expect(result.success).toBe(true);
-    expect(result.data).toBe('10_async');
+    expect(unwrapResult(result)).toBe('10_async');
   });
 
   it('[P09] pipe handles failure propagation', async () => {
@@ -482,6 +508,7 @@ describe('Composition', () => {
       map((x: number) => x * 2)
     );
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('error in chain');
   });
 
@@ -499,7 +526,7 @@ describe('Composition', () => {
     );
     expect(sideEffects).toEqual([5, 10]);
     expect(result.success).toBe(true);
-    expect(result.data).toBe(10);
+    expect(unwrapResult(result)).toBe(10);
   });
 
   it('[P11] pipe runs with multiple tapErrors on failure', async () => {
@@ -516,6 +543,7 @@ describe('Composition', () => {
     );
     expect(sideEffects).toEqual(['initial error', 'INITIAL ERROR']);
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('INITIAL ERROR');
   });
 
@@ -530,6 +558,7 @@ describe('Composition', () => {
     );
     expect(sideEffects).toEqual([]);
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error).toBe('fail');
   });
 
@@ -544,7 +573,7 @@ describe('Composition', () => {
     );
     expect(sideEffects).toEqual([]);
     expect(result.success).toBe(true);
-    expect(result.data).toBe(84);
+    expect(unwrapResult(result)).toBe(84);
   });
 });
 
@@ -557,7 +586,7 @@ describe('Collections', () => {
     ];
     const sequenced = sequence(results);
     expect(sequenced.success).toBe(true);
-    expect(sequenced.data).toEqual([1, 2, 3]);
+    expect(unwrapResult(sequenced)).toEqual([1, 2, 3]);
   });
 
   it('[L02] sequence returns first failure encountered', () => {
@@ -568,6 +597,7 @@ describe('Collections', () => {
     ];
     const sequenced = sequence(results);
     expect(sequenced.success).toBe(false);
+    if (!isFailure(sequenced)) return;
     expect(sequenced.error).toBe('first error');
   });
 
@@ -579,6 +609,7 @@ describe('Collections', () => {
     ];
     const sequenced = sequence(results);
     expect(sequenced.success).toBe(false);
+    if (!isFailure(sequenced)) return;
     expect(sequenced.error).toBe('first error');
   });
 
@@ -588,7 +619,7 @@ describe('Collections', () => {
       items
     );
     expect(result.success).toBe(true);
-    expect(result.data).toEqual([2, 4, 6]);
+    expect(unwrapResult(result)).toEqual([2, 4, 6]);
   });
 
   it('[L05] partitionResults splits mixed results correctly', () => {
@@ -648,6 +679,7 @@ describe('Validation', () => {
     ];
     const result = validate(validators)('ab');
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error.length).toBe(2);
   });
 
@@ -662,7 +694,7 @@ describe('Validation', () => {
     ];
     const result = validate(validators)('test@example.com');
     expect(result.success).toBe(true);
-    expect(result.data).toBe('test@example.com');
+    expect(unwrapResult(result)).toBe('test@example.com');
   });
 });
 
@@ -695,19 +727,19 @@ describe('Edge Cases', () => {
     const nested: Result<Result<string, number>, number> = success(inner);
     const flattened = chain((x: Result<string, number>) => x)(nested);
     expect(flattened.success).toBe(true);
-    expect(flattened.data).toBe('nested');
+    expect(unwrapResult(flattened)).toBe('nested');
   });
 
   it('[X02] handles empty arrays in sequence', () => {
     const result = sequence([]);
     expect(result.success).toBe(true);
-    expect(result.data.length).toBe(0);
+    expect(unwrapResult(result).length).toBe(0);
   });
 
   it('[X03] handles empty arrays in traverse', () => {
     const result = traverse((x: number) => success<number, string>(x * 2))([]);
     expect(result.success).toBe(true);
-    expect(result.data.length).toBe(0);
+    expect(unwrapResult(result).length).toBe(0);
   });
 
   it('[X04] handles undefined values in validators', () => {
@@ -719,6 +751,7 @@ describe('Edge Cases', () => {
     ];
     const result = validate(validators)(undefined);
     expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
     expect(result.error[0].message).toBe('Cannot be undefined');
   });
 });
