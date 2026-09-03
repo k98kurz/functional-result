@@ -10,6 +10,13 @@
   introduce new error types mid-pipeline (type-level fix, runtime unchanged)
 - `success` now defaults its error type to `never`; `Result<T, never>` is
   assignable to any `Result<T, E>`, so existing assignments keep compiling
+- Fixed `mapError` and `tapError` success-channel typing: applying them in
+  curried (non-pipe) form no longer collapses the data type to `unknown`
+  (`mapError(fn)(result)` now yields `Result<T, F>` and `tapError` preserves
+  `E`, even with an unannotated handler)
+- `getOrElse` now returns `T | D`, so a default value need not match the
+  success type exactly (e.g. `getOrElse(null)` works on `Result<string | null, E>`)
+- `sequence` and `traverse` now accept `readonly` arrays
 
 ## 0.0.3
 

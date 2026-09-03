@@ -21,6 +21,39 @@ Existing probes (`probe-curried-generics*.ts`) are gitignored and may not
 survive a clean checkout. For type-only fixes, emitted JS must be identical
 after stripping comments.
 
+## Split generics for EVERY channel a curried fn mentions, and check types in CI
+
+**Gotcha (2026-09-03):** The first pass above fixed the *error* channel but
+missed the *success* channel. `mapError` (`<T, E, F>` outer) and `tapError`
+(`<T, E>` outer) put `T` only on the second (Result) parameter, so at the
+curried first call `T` had no inference site and fell back to `unknown`. The
+result: applying `mapError(handler)` — a handler `(e: E) => F` — to a
+`Result<number, E>` returned `Result<unknown, F>` instead of
+`Result<number, F>` — silently, because `Result<number, E>` is assignable to
+`Result<unknown, E>`. The claim "handlers that mention `E` need
+no change — assignability already accepts narrower input errors" was true for
+the error channel only and overlooked `T`. The tapError unannotated-handler case
+was worse: `tapError(e => log(e))(r)` collapsed **both** channels to `unknown`.
+
+**Solution:** split generics so that *every* parameter (success and error) is
+inferred on the inner application:
+- `mapError` → `<E, F>(fn) => <T>(result): Result<T, F>` (T moves inner)
+- `tapError` → `<F>(fn) => <T, E extends F>(result): Result<T, E>` (F = errors the
+  handler accepts; `E extends F` preserves the actual error type while keeping a
+  narrow-handler-on-wider-union a type error)
+- `getOrElse` → `<D>(d) => <T, E>(result): T | D` (default need not equal `T`)
+- `sequence`/`traverse` → accept `readonly` arrays
+
+**Lesson:** the runtime test suite cannot detect type degradation — a collapsed
+`Result<unknown, unknown>` still compiles and runs. Type-level `Equal`/`Expect`
+assertions and `@ts-expect-error` safety guards must live in `test/` (covered by
+`tsconfig.test.json`, run by `npm run typecheck`), NOT in gitignored `temp/`
+probes that CI never executes. Verify emitted JS is unchanged for type-only
+fixes. Curried callbacks whose params mention a generic (`traverse`, `match`,
+`fold`) can't defer that generic — the callback's parameter must be annotated by
+the user (docs now say so); dual-arity overloads were considered and rejected in
+favor of documenting the annotation requirement.
+
 ## Union-parameter inference in `tryCatch`
 
 **Gotcha (2026-09-02):** `tryCatch`'s original union parameter

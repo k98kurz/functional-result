@@ -68,15 +68,16 @@ const map =
 /**
  * Transforms the failure value of a Result using the provided function.
  * Curried function: first takes the transformation function, then the Result.
- * @template T - Input success type (preserved)
  * @template E - Input error type
  * @template F - Output error type
+ * @template T - Input success type (preserved; inferred when the Result is
+ *  applied)
  * @param fn - Function to transform the error value
  * @returns Function that takes a Result and returns the transformed Result
  */
 const mapError =
-  <T, E, F>(fn: (error: E) => F) =>
-  (result: Result<T, E>): Result<T, F> =>
+  <E, F>(fn: (error: E) => F) =>
+  <T>(result: Result<T, E>): Result<T, F> =>
     result.success ? result : failure(fn(result.error));
 
 /**
@@ -97,14 +98,18 @@ const tap =
 /**
  * Executes a side-effect callback on failure, preserving the Result.
  * Curried function: first takes the callback, then the Result.
+ * The callback accepts the errors a result may carry (`F`); the actual result
+ * error type `E` is inferred when the Result is applied, so the error channel
+ * is preserved even when the callback leaves its parameter unannotated.
+ * @template F - Error type the callback accepts (a supertype of `E`)
  * @template T - Success type
- * @template E - Error type
+ * @template E - Error type of the input Result (`E extends F`; preserved)
  * @param fn - Side-effect callback for error values
  * @returns Function that takes a Result and returns the same Result
  */
 const tapError =
-  <T, E>(fn: (error: E) => void) =>
-  (result: Result<T, E>): Result<T, E> => {
+  <F>(fn: (error: F) => void) =>
+  <T, E extends F>(result: Result<T, E>): Result<T, E> => {
     if (!result.success) fn(result.error);
     return result;
   };
@@ -159,11 +164,11 @@ const fold = match;
  * Takes a sequence of Results, returning all success values or first failure.
  * @template T - Success type of individual Results
  * @template E - Error type
- * @param results - Array of Results to sequence
+ * @param results - Readonly array of Results to sequence
  * @returns Result containing array of success values or first failure
  *  encountered
  */
-const sequence = <T, E>(results: Result<T, E>[]): Result<T[], E> => {
+const sequence = <T, E>(results: readonly Result<T, E>[]): Result<T[], E> => {
   const acc: T[] = [];
   for (const result of results) {
     if (!result.success) return result;
@@ -180,11 +185,11 @@ const sequence = <T, E>(results: Result<T, E>[]): Result<T[], E> => {
  * @template U - Output Result success type
  * @template E - Error type
  * @param fn - Function that maps array elements to Results
- * @returns Function that takes an array and returns a sequenced Result
+ * @returns Function that takes a readonly array and returns a sequenced Result
  */
 const traverse =
   <T, U, E>(fn: (item: T) => Result<U, E>) =>
-  (items: T[]): Result<U[], E> =>
+  (items: readonly T[]): Result<U[], E> =>
     sequence(items.map(fn));
 
 /**
@@ -342,14 +347,15 @@ function tryCatchSync<T, E = unknown>(
 /**
  * Extracts the success value or returns a default value.
  * Curried function: first takes default value, then the Result.
+ * @template D - Type of the default value
  * @template T - Success type
  * @template E - Error type
  * @param defaultValue - Default value to return on failure
  * @returns Function that takes a Result and returns the value or default
  */
 const getOrElse =
-  <T>(defaultValue: T) =>
-  <E>(result: Result<T, E>): T =>
+  <D>(defaultValue: D) =>
+  <T, E>(result: Result<T, E>): T | D =>
     result.success ? result.data : defaultValue;
 
 /**

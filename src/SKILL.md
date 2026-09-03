@@ -109,6 +109,29 @@ const processInvalid = await pipe(
 // Returns: failure('Invalid number')
 ```
 
+`pipe` always returns a `Promise`. For pure synchronous flows, compose the
+curried combinators directly instead — no `Promise` wrapper, same typed error
+channel:
+
+```typescript
+import { chain, failure, mapError, success } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+type ParseError = { code: string };
+type ApiError = { code: string; message: string };
+
+const parse = (s: string): Result<number, ParseError> =>
+  isNaN(Number(s)) ? failure({ code: 'parse' }) : success(Number(s));
+
+const checkRange = (n: number): Result<number, ApiError> =>
+  n > 100 ? failure({ code: 'range', message: 'out of range' }) : success(n);
+
+const toApiError = (e: ParseError): ApiError => ({ code: e.code, message: 'invalid' });
+
+const process = (s: string): Result<number, ApiError> =>
+  chain(checkRange)(mapError(toApiError)(parse(s)));
+```
+
 ### Side effects with tap and tapError
 
 Both are curried and return the original Result unchanged, making them safe in pipelines:
@@ -253,12 +276,17 @@ const failed = sequence(withFailure);
 import { traverse } from '@k98kurz/functional-result';
 
 const items = ['1', '2', '3'];
-const result = traverse(x => {
+const result = traverse((x: string) => {
   const num = Number(x);
   return isNaN(num) ? failure('Invalid') : success(num * 2);
 })(items);
 // success([2, 4, 6])
 ```
+
+Annotate the callback parameter (`(x: string)`): `traverse` is curried, so the
+callback is typed at partial application before `items` is in scope, and an
+unannotated parameter infers as `unknown`. `sequence(items.map(fn))` is an
+equivalent that types the callback from the array instead.
 
 ### PartitionResults: Collect all successes and failures
 
@@ -321,15 +349,18 @@ import { match, fold } from '@k98kurz/functional-result';
 const result = success(42);
 
 const message = match(
-  (data) => `Success! Got: ${data}`,
-  (error) => `Failed with: ${error}`
+  (data: number) => `Success! Got: ${data}`,
+  (error: unknown) => `Failed with: ${error}`
 )(result);
 
 const finalValue = fold(
-  (data) => data.toString(),
-  (error) => 'default value'
+  (data: number) => data.toString(),
+  (error: unknown) => 'default value'
 )(result);
 ```
+
+Annotate the handler parameters: `match`/`fold` handlers are typed at
+application time, so unannotated parameters infer as `unknown`.
 
 ### Default values with getOrElse
 
@@ -341,6 +372,9 @@ const value = getOrElse(0)(successResult); // 42
 
 const failureResult = failure('error');
 const fallback = getOrElse(0)(failureResult); // 0
+
+// defaults need not match the success type exactly (returns T | D):
+const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
 ```
 
 ### Exiting the Result paradigm with unwrapResult
@@ -404,12 +438,15 @@ if (isFailure(result)) {
 
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
+- **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead
+- **Sync composition**: `pipe` is async-only; for pure sync flows, compose `map`/`chain`/`mapError` directly without the `Promise` wrapper
 - **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
 - **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
 - **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
-- **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures
-- **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values)
+- **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures. Both accept `readonly` arrays
+- **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values). A `mapError`/`tapError` handler must cover the full union of errors it may encounter
+- **getOrElse defaults**: `getOrElse(defaultValue)` returns `T | D`, so the default need not match the success type exactly (e.g. `getOrElse(null)` on `Result<string | null, E>`)
 - **Error widening**: `chain` unions its step's errors with the input's (`Result<T, E>` + step returning `Result<U, F>` → `Result<U, E | F>`); `map` and `tap` preserve the input error type
 - **Error propagation**: `pipe` invokes every operation even after a failure — `map`/`chain`/`tap` no-op on a failed Result (while `mapError`/`tapError` still run), which makes steps *appear* skipped
 - **Default error type**: `Result<T, E>` defaults `E` to `unknown`; `success(x)` types as `Result<T, never>`, which is assignable to any error type
@@ -500,4 +537,3 @@ try {
   handleError(error);
 }
 ```
-
