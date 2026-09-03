@@ -1,5 +1,51 @@
 # Memory
 
+## Example code is a single source of truth, verified in CI
+
+**Decision (2026-09-03):** Every TypeScript snippet embedded in `readme.md` and
+`src/SKILL.md` lives verbatim in `examples/<id>.ts` (the `id` matches a
+`<!-- example: <id> -->` sentinel placed immediately above the doc fence).
+`scripts/check-examples.mjs` enforces the contract; `npm run check:examples`
+runs `tsc -p tsconfig.examples.json` first, then the checker. Both are wired
+into `prepublishOnly` and `checklist.sh`. All 41 sentinels are stamped and the
+checker verifies snippet sync live (0 errors as of stamping day).
+
+**Example file format:** a `// @docs: <doc>[, <doc>...]` header listing
+registered locations, then a snippet region delimited by `// @snippet-start` /
+`// @snippet-end`. Scaffold (stub types/helpers the snippet references, plus any
+imports the snippet uses but didn't declare) lives OUTSIDE the region so the
+doc text stays verbatim. Exactly one region per file (doc snippets each carry
+their own imports, which would collide in one file). Imports use the package
+name verbatim; `tsconfig.examples.json` maps `@k98kurz/functional-result` to
+`./src/functional-result` so examples compile as-is. Base config's
+`module: ES2022` permits top-level `await`; `noUnusedLocals` is off.
+
+**Intentionally non-compiling examples** (fragments / deliberate anti-patterns)
+go in `examples/illustrative/`, marked `// @no-compile`, and are excluded from
+`tsconfig.examples.json`. They are still text-checked.
+
+**Detection on day one:** the checker's first run found 82 missing-sentinel
+errors (41 fences unstamped + 41 registered locations absent) and, separately,
+8 examples that fail strict compilation due to genuine doc bugs: unannotated
+`map`/`tap` callbacks (`map-basic`, `tap-tap-error`, `skill-map`,
+`skill-tap-tap-error`), a redeclared `const result` (`skill-creating-results`),
+`return pipe(...)` in a `Result`-typed fn (`complex-type-transform`), a
+`traverse` result passed to `partitionResults` (`skill-batch-processing`), and
+a top-level `return` fragment (`skill-conversion-before`). These are the issues
+to fix in the docs (pass 2), NOT scaffold problems. Until they are fixed,
+`typecheck:examples` is red, so `npm run check:examples` stops at tsc and the
+checker's sentinel report is only visible via `node scripts/check-examples.mjs`.
+
+**Lint covers examples too:** the `lint` script runs eslint over
+`examples/**/*.ts` with the base block (recommended + `max-len 85`,
+`no-unused-vars` off). `examples/illustrative/` is ignored by eslint (its
+`no-redeclare`s are deliberate) just as it is excluded from tsc. Known-red
+until pass 2: the 7 region max-len violations (over-length lines copied
+verbatim from the docs) + `skill-creating-results` no-redeclare. When fixing
+region long lines, wrap them in BOTH the doc fence and the example region so
+the checker stays green. Prettier deliberately does NOT cover `examples/`: its
+reformatting would desync verbatim regions from the docs and trip the checker.
+
 ## Curried functions must not share one error generic across applications
 
 **Gotcha (2026-09-02):** A single `E` on a curried function binds at the first

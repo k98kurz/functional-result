@@ -61,6 +61,7 @@ handle errors explicitly without throwing exceptions.
 
 #### Creating Results
 
+<!-- example: creating-results -->
 ```typescript
 import { success, failure } from '@k98kurz/functional-result';
 
@@ -77,6 +78,7 @@ const failed = failure('Something went wrong');
 
 Use `map` to transform success values while preserving failures:
 
+<!-- example: map-basic -->
 ```typescript
 import { map } from '@k98kurz/functional-result';
 
@@ -93,6 +95,7 @@ const unchanged = map(x => x * 2)(failed);
 
 Use `chain` to sequence operations that may fail:
 
+<!-- example: chain-basic -->
 ```typescript
 import { chain, success, failure } from '@k98kurz/functional-result';
 
@@ -123,6 +126,7 @@ Use `tap` for side effects on success (e.g. logging) and `tapError` for side
 effects on failure. Both return the original Result unchanged, so they fit in
 pipelines:
 
+<!-- example: tap-tap-error -->
 ```typescript
 import { tap, tapError } from '@k98kurz/functional-result';
 
@@ -143,6 +147,7 @@ const result = await pipe(
 
 Use `match` or `fold` to handle both success and failure cases:
 
+<!-- example: match-fold -->
 ```typescript
 import { match, fold, success } from '@k98kurz/functional-result';
 
@@ -170,6 +175,7 @@ would otherwise default to `unknown`.
 
 Use `getOrElse` to unwrap a result with a fallback value on failure:
 
+<!-- example: get-or-else -->
 ```typescript
 import { getOrElse } from '@k98kurz/functional-result';
 
@@ -186,6 +192,7 @@ const fallback = getOrElse(0)(failureResult);
 
 The `pipe` function allows you to compose operations in a readable way:
 
+<!-- example: pipe-composition -->
 ```typescript
 import { pipe, map, chain } from '@k98kurz/functional-result';
 
@@ -211,6 +218,7 @@ const processInvalid = await pipe(
 
 You can also create reusable operations in point-free style:
 
+<!-- example: pipe-pointfree -->
 ```typescript
 const double = map((x: number) => x * 2);
 const toString = map((x: number) => x.toString());
@@ -230,6 +238,7 @@ pure synchronous flows — where you don't want to introduce `async`/`await` int
 the call chain — compose the combinators directly instead. The curried
 combinators compose like ordinary functions:
 
+<!-- example: sync-composition -->
 ```typescript
 import { chain, failure, mapError, success } from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
@@ -265,6 +274,7 @@ synchronous.
 
 Use `sequence` to handle arrays of Results:
 
+<!-- example: sequence -->
 ```typescript
 import { sequence } from '@k98kurz/functional-result';
 
@@ -292,6 +302,7 @@ const failed = sequence(withFailure);
 
 Use `traverse` to map arrays with functions that return Results:
 
+<!-- example: traverse-basic -->
 ```typescript
 import { traverse } from '@k98kurz/functional-result';
 
@@ -310,6 +321,7 @@ is equivalent — `items.map` types the callback from the array elements directl
 
 Use `partitionResults` to collect all successes and failures separately:
 
+<!-- example: partition-results -->
 ```typescript
 import { partitionResults } from '@k98kurz/functional-result';
 
@@ -329,6 +341,7 @@ const { successes, failures } = partitionResults(results);
 
 Use `validate` to collect multiple validation errors:
 
+<!-- example: validate-basic -->
 ```typescript
 import { validate } from '@k98kurz/functional-result';
 
@@ -366,6 +379,7 @@ The `tryCatch` function wraps both synchronous and asynchronous operations,
 providing a unified interface for error handling. This makes it easy to integrate
 existing code that uses exceptions. However, it must be used with `await`:
 
+<!-- example: try-catch -->
 ```typescript
 import { tryCatch } from '@k98kurz/functional-result';
 
@@ -397,6 +411,7 @@ The `tryCatchSync` function is a sync-only version of `tryCatch` that returns a
 synchronous and want to avoid the overhead of `Promise` wrapping, or when you
 can't use `await`:
 
+<!-- example: try-catch-sync -->
 ```typescript
 import { tryCatchSync } from '@k98kurz/functional-result';
 
@@ -425,6 +440,7 @@ The library provides seamless interoperability between Result-based error handli
 and traditional try-catch systems. Use `unwrapResult` (alias: `getOrThrow`) to
 convert a `Result` back to standard exception-based code:
 
+<!-- example: unwrap-get-orthrow -->
 ```typescript
 import { tryCatch, unwrapResult, getOrThrow } from '@k98kurz/functional-result';
 
@@ -439,6 +455,7 @@ const data2 = getOrThrow(result);
 Note: If your error type is not already an `Error`, consider using `mapError` to
 convert it before calling `unwrapResult` to ensure proper stack trace support:
 
+<!-- example: map-error-stack-trace -->
 ```typescript
 const result = await someFunctionReturnsResult();
 const ensureError = mapError((err: CustomError) => {
@@ -461,6 +478,7 @@ This allows gradual migration from exception-based to Result-based code:
 
 Use type guards to narrow Result types for imperative style:
 
+<!-- example: type-guards -->
 ```typescript
 import { isSuccess, isFailure } from '@k98kurz/functional-result';
 
@@ -477,6 +495,7 @@ if (isSuccess(result)) {
 
 #### Complex Type Transformations
 
+<!-- example: complex-type-transform -->
 ```typescript
 import { map, chain } from '@k98kurz/functional-result';
 

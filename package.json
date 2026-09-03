@@ -31,16 +31,18 @@
     "test:dist": "npm run build && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" && node scripts/check-jsdoc-lines.mjs",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"examples/**/*.ts\" && node scripts/check-jsdoc-lines.mjs",
     "check:jsdoc": "node scripts/check-jsdoc-lines.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "typecheck:src": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck:examples": "tsc -p tsconfig.examples.json",
+    "check:examples": "npm run typecheck:examples && node scripts/check-examples.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "publish:npm": "npm publish",
     "publish:github": "npm publish --registry https://npm.pkg.github.com",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run test:dist"
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test:dist && npm run check:examples"
   },
   "repository": {
     "type": "git",

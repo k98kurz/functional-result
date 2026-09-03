@@ -34,6 +34,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'coverage/'],
+    ignores: ['dist/', 'coverage/', 'examples/illustrative/'],
   }
 );

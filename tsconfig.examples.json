@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "paths": {
+      "@k98kurz/functional-result": ["./src/functional-result"]
+    }
+  },
+  "include": ["examples/**/*.ts"],
+  "exclude": ["node_modules", "dist", "examples/illustrative"]
+}

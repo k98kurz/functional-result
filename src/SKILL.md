@@ -11,8 +11,8 @@ compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
-  version: "0.0.2"
-  last-updated: "2026-08-15"
+  version: "0.0.4"
+  last-updated: "2026-09-03"
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
@@ -38,6 +38,7 @@ Use `@k98kurz/functional-result` when:
 
 ### Creating Results
 
+<!-- example: skill-creating-results -->
 ```typescript
 import { success, failure } from '@k98kurz/functional-result';
 
@@ -52,6 +53,7 @@ const result = failure('Database connection failed');
 
 Use `map` when the transformation cannot fail:
 
+<!-- example: skill-map -->
 ```typescript
 import { map } from '@k98kurz/functional-result';
 
@@ -67,6 +69,7 @@ const unchanged = map(s => s.trim())(failed); // still failure('error')
 
 Use `chain` when the transformation returns a Result:
 
+<!-- example: skill-chain -->
 ```typescript
 import { chain, success, failure } from '@k98kurz/functional-result';
 
@@ -87,6 +90,7 @@ const failedChain = chain(parseNumber)(badResult); // failure('Invalid number')
 
 Use `pipe` for readable operation chains. Failures skip subsequent operations:
 
+<!-- example: skill-pipe -->
 ```typescript
 import { pipe, map, chain, success, failure } from '@k98kurz/functional-result';
 
@@ -113,6 +117,7 @@ const processInvalid = await pipe(
 curried combinators directly instead — no `Promise` wrapper, same typed error
 channel:
 
+<!-- example: skill-sync-composition -->
 ```typescript
 import { chain, failure, mapError, success } from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
@@ -136,6 +141,7 @@ const process = (s: string): Result<number, ApiError> =>
 
 Both are curried and return the original Result unchanged, making them safe in pipelines:
 
+<!-- example: skill-tap-tap-error -->
 ```typescript
 import { tap, tapError, pipe, map, success, failure } from '@k98kurz/functional-result';
 
@@ -164,6 +170,7 @@ const failed = await pipe(
 Use `tryCatch` for operations that may be async or sync. For synchronous-only
 operations where you want to avoid Promise overhead, use `tryCatchSync`:
 
+<!-- example: skill-try-catch-migration -->
 ```typescript
 import { tryCatch, tryCatchSync } from '@k98kurz/functional-result';
 
@@ -196,6 +203,7 @@ const safeParse = (json: string) =>
 ### Pattern 2: Converting existing error handling
 
 **Before (exception-based):**
+<!-- example: skill-conversion-before -->
 ```typescript
 function getUser(id: number): User {
   const user = db.find(id);
@@ -217,6 +225,7 @@ try {
 ```
 
 **After (Result-based):**
+<!-- example: skill-conversion-after -->
 ```typescript
 import { pipe, chain, match, success, failure } from '@k98kurz/functional-result';
 
@@ -247,6 +256,7 @@ async function somePipeline() {
 
 ### Sequence: Handle arrays of Results
 
+<!-- example: skill-sequence -->
 ```typescript
 import { sequence, success, failure } from '@k98kurz/functional-result';
 
@@ -272,6 +282,7 @@ const failed = sequence(withFailure);
 
 ### Traverse: Map arrays with functions that return Results
 
+<!-- example: skill-traverse -->
 ```typescript
 import { traverse } from '@k98kurz/functional-result';
 
@@ -290,6 +301,7 @@ equivalent that types the callback from the array instead.
 
 ### PartitionResults: Collect all successes and failures
 
+<!-- example: skill-partition -->
 ```typescript
 import { partitionResults, success, failure } from '@k98kurz/functional-result';
 
@@ -317,6 +329,7 @@ if (failures.length > 0) {
 
 Use `validate` when you need to collect all validation errors:
 
+<!-- example: skill-validate -->
 ```typescript
 import { validate, type ValidationError } from '@k98kurz/functional-result';
 
@@ -343,6 +356,7 @@ const invalid = emailValidator('ab');
 
 Both are curried. `fold` is an alias of `match` for semantic clarity:
 
+<!-- example: skill-match-fold -->
 ```typescript
 import { match, fold } from '@k98kurz/functional-result';
 
@@ -364,6 +378,7 @@ application time, so unannotated parameters infer as `unknown`.
 
 ### Default values with getOrElse
 
+<!-- example: skill-get-or-else -->
 ```typescript
 import { getOrElse } from '@k98kurz/functional-result';
 
@@ -382,6 +397,7 @@ const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
 Use `unwrapResult` (alias: `getOrThrow`) to convert Results back to
 exception-based code:
 
+<!-- example: skill-unwrap -->
 ```typescript
 import { unwrapResult, tryCatch } from '@k98kurz/functional-result';
 
@@ -401,6 +417,7 @@ app.get('/users/:id', async (req, res) => {
 Note: When using `unwrapResult`, consider converting custom error types to proper
 `Error` instances first to preserve stack traces:
 
+<!-- example: skill-map-error-stack-trace -->
 ```typescript
 const result = await someFunctionReturnsResult();
 const ensureError = mapError((err: CustomError) => {
@@ -415,6 +432,7 @@ const data = unwrapResult(ensureError(result));
 
 Use type guards to narrow Result types in conditionals:
 
+<!-- example: skill-type-guards -->
 ```typescript
 import { isSuccess, isFailure } from '@k98kurz/functional-result';
 
@@ -456,6 +474,7 @@ if (isFailure(result)) {
 
 ### API call wrapper
 
+<!-- example: skill-api-call-wrapper -->
 ```typescript
 import { tryCatch, map } from '@k98kurz/functional-result';
 
@@ -475,6 +494,7 @@ const fetchApi = async <T>(url: string): Promise<Result<T, string>> => {
 
 ### Validation pipeline
 
+<!-- example: skill-validation-pipeline -->
 ```typescript
 import { pipe, validate, map, chain } from '@k98kurz/functional-result';
 
@@ -490,6 +510,7 @@ const validateAndProcessUser = (input: unknown) => {
 
 ### Partial batch processing
 
+<!-- example: skill-batch-processing -->
 ```typescript
 import { traverse, partitionResults } from '@k98kurz/functional-result';
 
@@ -512,6 +533,7 @@ const processBatch = async (items: string[]) => {
 
 ## Anti-patterns to avoid
 
+<!-- example: anti-patterns -->
 ```typescript
 // DON'T: Use map for operations that return Results
 const bad = map(x => success(x * 2))(result); // Returns Result<Result<number, E>, E>
