@@ -1,3 +1,8 @@
+## 0.0.4 (WIP)
+
+- Fixed `tryCatch` type inference: promise-returning thunks now bind `T` to the
+  awaited value instead of `Promise<T>` (type-level fix, runtime unchanged)
+
 ## 0.0.3
 
 - Improved bundled skill file to document an avoidable anti-pattern

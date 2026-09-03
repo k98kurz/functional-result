@@ -275,10 +275,17 @@ const isFailure = <T, E>(
  * @returns Promise resolving to a Result
  */
 function tryCatch<T>(
-  fn: (() => T) | (() => Promise<T>)
+  fn: () => Promise<T>
+): Promise<Result<T, unknown>>;
+function tryCatch<T>(
+  fn: () => T
 ): Promise<Result<T, unknown>>;
 function tryCatch<T, E>(
-  fn: (() => T) | (() => Promise<T>),
+  fn: () => Promise<T>,
+  errorTransformer: (error: unknown) => E
+): Promise<Result<T, E>>;
+function tryCatch<T, E>(
+  fn: () => T,
   errorTransformer: (error: unknown) => E
 ): Promise<Result<T, E>>;
 

@@ -1,5 +1,21 @@
 # Memory
 
+## Union-parameter inference in `tryCatch`
+
+**Gotcha (2026-09-02):** `tryCatch`'s original union parameter
+`(() => T) | (() => Promise<T>)` bound `T = Promise<X>` for promise-returning
+thunks (TypeScript breaks inference ties toward the first union constituent),
+typing `.data` as a `Promise` while the runtime correctly awaited to `X`. It
+survived unnoticed because tests are excluded from type checking (see
+"tsconfig scope and typecheck" above) and Vitest doesn't typecheck.
+
+**Solution:** Ordered overloads with the async signature first — overload
+resolution is a documented first-match-wins rule, unlike union inference
+tie-breaking. A type-level probe is kept in `temp/probe.ts`; run it with
+explicit-file `tsc` flags (`tsconfig.json` only includes `src`) whenever
+touching public generics. Consider `Awaited<T>` if a signature ever needs to
+normalize promise-or-value returns by construction.
+
 ## Read tool truncates large windows in long source files
 
 **Gotcha (2026-08-15):** The agent's file-read tool silently truncates large
