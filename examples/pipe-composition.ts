@@ -1,10 +1,10 @@
-// @docs: readme.md
+// @docs: readme.md, src/SKILL.md
 import { success, failure } from '@k98kurz/functional-result';
 // @snippet-start
 import { pipe, map, chain } from '@k98kurz/functional-result';
 
 const processInput = await pipe(
-  success('5'),
+  success('  5  '),
   map(s => s.trim()),
   map(s => parseInt(s, 10)),
   chain(n => isNaN(n) ? failure('Invalid number') : success(n)),

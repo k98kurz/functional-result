@@ -19,11 +19,13 @@ function getPosts(user: User): Post[] {
   return db.posts.filter(p => p.userId === user.id);
 }
 
-try {
-  const user = getUser(1);
-  const posts = getPosts(user);
-  return posts;
-} catch (error) {
-  handleError(error);
+function getUserPosts(id: number): Post[] | undefined {
+  try {
+    const user = getUser(id);
+    const posts = getPosts(user);
+    return posts;
+  } catch (error) {
+    handleError(error);
+  }
 }
 // @snippet-end

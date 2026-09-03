@@ -1,4 +1,4 @@
-// @docs: readme.md
+// @docs: readme.md, src/SKILL.md
 // @snippet-start
 import { chain, success, failure } from '@k98kurz/functional-result';
 

@@ -1,4 +1,4 @@
-// @docs: readme.md
+// @docs: readme.md, src/SKILL.md
 import { success } from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
 // @snippet-start
@@ -12,5 +12,10 @@ if (isSuccess(result)) {
 } else {
   // TypeScript knows result.error is a number here
   console.log(`Error code: ${result.error}`);
+}
+
+// isFailure is the inverse
+if (isFailure(result)) {
+  console.log(`Error: ${result.error}`);
 }
 // @snippet-end

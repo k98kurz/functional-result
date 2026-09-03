@@ -1,5 +1,9 @@
 ## 0.0.4 (WIP)
 
+- **BREAKING:** explicit type arguments on curried `mapError`, `tapError`, and
+  `getOrElse` must be reordered: `mapError<E, F>(fn)`, `tapError<F>(fn)`,
+  `getOrElse<D>(default)`. Code passing explicit type arguments breaks; code
+  relying on inference is unaffected
 - Fixed `tryCatch` type inference: promise-returning thunks now bind `T` to the
   awaited value instead of `Promise<T>` (type-level fix, runtime unchanged)
 - Fixed curried generics for `chain`, `map`, and `tap`: the error type is no

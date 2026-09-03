@@ -12,7 +12,10 @@ const fetchApi = async <T>(url: string): Promise<Result<T, string>> => {
       }
       return response.json() as T;
     },
-    (error) => `API request failed: ${error instanceof Error ? error.message : String(error)}`
+    (error) =>
+      `API request failed: ${error instanceof Error
+        ? error.message
+        : String(error)}`
   );
 };
 // @snippet-end

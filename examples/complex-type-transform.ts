@@ -7,11 +7,13 @@ import { map, chain } from '@k98kurz/functional-result';
 type User = { id: number; name: string };
 type ApiError = { code: string; message: string };
 
-const processUser = (user: User): Result<string, ApiError> => {
+const processUser = (user: User): Promise<Result<string, ApiError>> => {
   return pipe(
     success(user),
     map(u => ({ ...u, email: `${u.name}@example.com` })),
-    chain(u => u.id > 0 ? success(JSON.stringify(u)) : failure({ code: 'INVALID', message: 'Invalid ID' }))
+    chain(u => u.id > 0
+      ? success(JSON.stringify(u))
+      : failure({ code: 'INVALID', message: 'Invalid ID' }))
   );
 };
 // @snippet-end

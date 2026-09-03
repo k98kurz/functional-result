@@ -1,4 +1,4 @@
-// @docs: readme.md
+// @docs: readme.md, src/SKILL.md
 const sometimesThrows = (): unknown => {
   throw new Error('boom');
 };
@@ -15,6 +15,7 @@ const syncResult = tryCatchSync(() => {
 // Transform errors for better context
 const result = tryCatchSync(
   () => sometimesThrows(),
-  (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
+  (error) =>
+    `Operation failed: ${error instanceof Error ? error.message : String(error)}`
 );
 // @snippet-end

@@ -1,15 +1,24 @@
-// @docs: readme.md
-import { pipe, success, map } from '@k98kurz/functional-result';
+// @docs: readme.md, src/SKILL.md
 // @snippet-start
-import { tap, tapError } from '@k98kurz/functional-result';
+import {
+  tap, tapError, pipe, map, success, failure
+} from '@k98kurz/functional-result';
 
-const logResult = tap((data) => console.log('Success:', data));
-const logFailure = tapError((err) => console.error('Failure:', err));
+const logSuccess = tap((data: string) => console.log('Success:', data));
+const logFailure = tapError((err: string) => console.error(err));
 
 const result = await pipe(
-  success(42),
-  logResult,   // logs "Success: 42" — result passes through
-  map(x => x * 2)
+  success('  hello  '),
+  logSuccess,   // logs "Success:   hello  " — result passes through
+  logFailure,   // does nothing
+  map(s => s.trim().toUpperCase()),
+  logSuccess    // logs "Success: HELLO"
 );
-// final result is still success(84)
+
+// Failures skip success taps and run error taps
+const failed = await pipe(
+  failure('db timeout'),
+  logSuccess,   // does nothing
+  logFailure    // logs "db timeout"
+);
 // @snippet-end

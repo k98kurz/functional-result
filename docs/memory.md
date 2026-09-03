@@ -2,49 +2,44 @@
 
 ## Example code is a single source of truth, verified in CI
 
-**Decision (2026-09-03):** Every TypeScript snippet embedded in `readme.md` and
-`src/SKILL.md` lives verbatim in `examples/<id>.ts` (the `id` matches a
-`<!-- example: <id> -->` sentinel placed immediately above the doc fence).
-`scripts/check-examples.mjs` enforces the contract; `npm run check:examples`
-runs `tsc -p tsconfig.examples.json` first, then the checker. Both are wired
-into `prepublishOnly` and `checklist.sh`. All 41 sentinels are stamped and the
-checker verifies snippet sync live (0 errors as of stamping day).
+**Decision (2026-09-03, consolidated same day):** Every TypeScript snippet
+embedded in `readme.md` and `src/SKILL.md` lives verbatim in `examples/<id>.ts`
+(the `id` matches a `<!-- example: <id> -->` sentinel placed immediately above
+the doc fence). `scripts/check-examples.mjs` enforces the contract;
+`npm run check:examples` runs `tsc -p tsconfig.examples.json` first, then the
+checker. Both are wired into `prepublishOnly` and `checklist.sh`. State after
+consolidation: 42 fences served by 26 example files, tsc/eslint/checker all
+green.
+
+**One snippet, many docs:** where readme and SKILL showed near-identical
+snippets, they were merged into ONE file whose `@docs:` header lists both docs;
+both fences carry the same id and byte-identical content. The `skill-` prefix
+now survives only on SKILL-only standalones (`skill-api-call-wrapper`,
+`skill-batch-processing`, `skill-conversion-before/after`, `skill-unwrap`,
+`skill-validation-pipeline`); shared examples use the plain id. Doc fences must
+be edited together with the example region — edit the region in the `.ts` file
+first, then re-sync the fence (byte-exact replacement; the checker fails on any
+drift). `examples/illustrative/` holds intentionally non-compiling fragments,
+marked `// @no-compile`, excluded from tsc and eslint but still text-checked.
 
 **Example file format:** a `// @docs: <doc>[, <doc>...]` header listing
-registered locations, then a snippet region delimited by `// @snippet-start` /
+registered locations, then one snippet region delimited by `// @snippet-start` /
 `// @snippet-end`. Scaffold (stub types/helpers the snippet references, plus any
 imports the snippet uses but didn't declare) lives OUTSIDE the region so the
-doc text stays verbatim. Exactly one region per file (doc snippets each carry
-their own imports, which would collide in one file). Imports use the package
-name verbatim; `tsconfig.examples.json` maps `@k98kurz/functional-result` to
+doc text stays verbatim. Imports use the package name verbatim;
+`tsconfig.examples.json` maps `@k98kurz/functional-result` to
 `./src/functional-result` so examples compile as-is. Base config's
 `module: ES2022` permits top-level `await`; `noUnusedLocals` is off.
 
-**Intentionally non-compiling examples** (fragments / deliberate anti-patterns)
-go in `examples/illustrative/`, marked `// @no-compile`, and are excluded from
-`tsconfig.examples.json`. They are still text-checked.
-
-**Detection on day one:** the checker's first run found 82 missing-sentinel
-errors (41 fences unstamped + 41 registered locations absent) and, separately,
-8 examples that fail strict compilation due to genuine doc bugs: unannotated
-`map`/`tap` callbacks (`map-basic`, `tap-tap-error`, `skill-map`,
-`skill-tap-tap-error`), a redeclared `const result` (`skill-creating-results`),
-`return pipe(...)` in a `Result`-typed fn (`complex-type-transform`), a
-`traverse` result passed to `partitionResults` (`skill-batch-processing`), and
-a top-level `return` fragment (`skill-conversion-before`). These are the issues
-to fix in the docs (pass 2), NOT scaffold problems. Until they are fixed,
-`typecheck:examples` is red, so `npm run check:examples` stops at tsc and the
-checker's sentinel report is only visible via `node scripts/check-examples.mjs`.
-
-**Lint covers examples too:** the `lint` script runs eslint over
-`examples/**/*.ts` with the base block (recommended + `max-len 85`,
-`no-unused-vars` off). `examples/illustrative/` is ignored by eslint (its
-`no-redeclare`s are deliberate) just as it is excluded from tsc. Known-red
-until pass 2: the 7 region max-len violations (over-length lines copied
-verbatim from the docs) + `skill-creating-results` no-redeclare. When fixing
-region long lines, wrap them in BOTH the doc fence and the example region so
-the checker stays green. Prettier deliberately does NOT cover `examples/`: its
-reformatting would desync verbatim regions from the docs and trip the checker.
+**Snippet conventions (set during consolidation):** comments show serialized
+result shapes (`// { success: true, data: 10 }`); the richer variant of any
+merged pair wins (failure-path demos are kept); all doc snippets compile
+strictly — annotate curried callbacks at partial application
+(`map((s: string) => ...)`), never feed a `traverse` Result (single Result) to
+`partitionResults` (array of Results — use `items.map(fn)`), and wrap
+imperative fragments in a function instead of top-level `try`/`return`. Keep
+every line ≤ 85 chars (`max-len` covers `examples/**`); prettier deliberately
+does NOT cover `examples/` (reformatting would desync verbatim regions).
 
 ## Curried functions must not share one error generic across applications
 

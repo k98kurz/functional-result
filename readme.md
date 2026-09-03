@@ -82,13 +82,14 @@ Use `map` to transform success values while preserving failures:
 ```typescript
 import { map } from '@k98kurz/functional-result';
 
-const result = success(5);
-const doubled = map(x => x * 2)(result);
-// { success: true, data: 10 }
+const result = success('  hello  ');
+const trimmed = map((s: string) => s.trim())(result);
+// { success: true, data: 'hello' }
 
+// Failures pass through unchanged
 const failed = failure('error');
-const unchanged = map(x => x * 2)(failed);
-// { success: false, error: 'error' } - failures pass through unchanged
+const unchanged = map((s: string) => s.trim())(failed);
+// { success: false, error: 'error' }
 ```
 
 #### Chaining Operations
@@ -128,17 +129,27 @@ pipelines:
 
 <!-- example: tap-tap-error -->
 ```typescript
-import { tap, tapError } from '@k98kurz/functional-result';
+import {
+  tap, tapError, pipe, map, success, failure
+} from '@k98kurz/functional-result';
 
-const logResult = tap((data) => console.log('Success:', data));
-const logFailure = tapError((err) => console.error('Failure:', err));
+const logSuccess = tap((data: string) => console.log('Success:', data));
+const logFailure = tapError((err: string) => console.error(err));
 
 const result = await pipe(
-  success(42),
-  logResult,   // logs "Success: 42" — result passes through
-  map(x => x * 2)
+  success('  hello  '),
+  logSuccess,   // logs "Success:   hello  " — result passes through
+  logFailure,   // does nothing
+  map(s => s.trim().toUpperCase()),
+  logSuccess    // logs "Success: HELLO"
 );
-// final result is still success(84)
+
+// Failures skip success taps and run error taps
+const failed = await pipe(
+  failure('db timeout'),
+  logSuccess,   // does nothing
+  logFailure    // logs "db timeout"
+);
 ```
 
 ### Pattern Matching and Extraction
@@ -186,6 +197,9 @@ const value = getOrElse(0)(successResult);
 const failureResult = failure('error');
 const fallback = getOrElse(0)(failureResult);
 // 0
+
+// defaults need not match the success type exactly (returns T | D):
+const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
 ```
 
 ### Composition and Pipelining
@@ -197,7 +211,7 @@ The `pipe` function allows you to compose operations in a readable way:
 import { pipe, map, chain } from '@k98kurz/functional-result';
 
 const processInput = await pipe(
-  success('5'),
+  success('  5  '),
   map(s => s.trim()),
   map(s => parseInt(s, 10)),
   chain(n => isNaN(n) ? failure('Invalid number') : success(n)),
@@ -255,7 +269,10 @@ const checkRange = (n: number): Result<number, ApiError> =>
   n > 100 ? failure({ code: 'range', message: `${n} is out of range` }) : success(n);
 
 // a synchronous multi-step flow, with a typed error channel throughout
-const toApiError = (e: ParseError): ApiError => ({ code: e.code, message: 'Invalid input' });
+const toApiError = (e: ParseError): ApiError => ({
+  code: e.code,
+  message: 'Invalid input'
+});
 
 const processInput = (input: string): Result<number, ApiError> =>
   chain(checkRange)(mapError(toApiError)(parse(input)));
@@ -306,8 +323,11 @@ Use `traverse` to map arrays with functions that return Results:
 ```typescript
 import { traverse } from '@k98kurz/functional-result';
 
-const items = [1, 2, 3];
-const result = traverse((x: number) => success(x * 2))(items);
+const items = ['1', '2', '3'];
+const result = traverse((x: string) => {
+  const num = Number(x);
+  return isNaN(num) ? failure('Invalid') : success(num * 2);
+})(items);
 // { success: true, data: [2, 4, 6] }
 ```
 
@@ -335,6 +355,14 @@ const results = [
 const { successes, failures } = partitionResults(results);
 // successes: [1, 2]
 // failures: ['error1', 'error2']
+
+// Use case: partial failure processing
+if (successes.length > 0) {
+  console.log(`Processed ${successes.length} items`);
+}
+if (failures.length > 0) {
+  console.log(`${failures.length} items failed`);
+}
 ```
 
 ### Validation
@@ -400,7 +428,8 @@ const asyncResult = await tryCatch(async () => {
 // Transform errors for better context
 const result = await tryCatch(
   () => sometimesThrows(),
-  (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
+  (error) =>
+    `Operation failed: ${error instanceof Error ? error.message : String(error)}`
 );
 ```
 
@@ -425,7 +454,8 @@ const syncResult = tryCatchSync(() => {
 // Transform errors for better context
 const result = tryCatchSync(
   () => sometimesThrows(),
-  (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
+  (error) =>
+    `Operation failed: ${error instanceof Error ? error.message : String(error)}`
 );
 ```
 
@@ -460,7 +490,7 @@ convert it before calling `unwrapResult` to ensure proper stack trace support:
 const result = await someFunctionReturnsResult();
 const ensureError = mapError((err: CustomError) => {
   const error = new Error(err.message);
-  error.stack = err.stack || error.stack;
+  if (err.stack) error.stack = err.stack;
   return error;
 });
 const data = unwrapResult(ensureError(result));
@@ -491,6 +521,11 @@ if (isSuccess(result)) {
   // TypeScript knows result.error is a number here
   console.log(`Error code: ${result.error}`);
 }
+
+// isFailure is the inverse
+if (isFailure(result)) {
+  console.log(`Error: ${result.error}`);
+}
 ```
 
 #### Complex Type Transformations
@@ -502,11 +537,13 @@ import { map, chain } from '@k98kurz/functional-result';
 type User = { id: number; name: string };
 type ApiError = { code: string; message: string };
 
-const processUser = (user: User): Result<string, ApiError> => {
+const processUser = (user: User): Promise<Result<string, ApiError>> => {
   return pipe(
     success(user),
     map(u => ({ ...u, email: `${u.name}@example.com` })),
-    chain(u => u.id > 0 ? success(JSON.stringify(u)) : failure({ code: 'INVALID', message: 'Invalid ID' }))
+    chain(u => u.id > 0
+      ? success(JSON.stringify(u))
+      : failure({ code: 'INVALID', message: 'Invalid ID' }))
   );
 };
 ```
@@ -519,7 +556,7 @@ const processUser = (user: User): Result<string, ApiError> => {
 - Async pipe: The `pipe` function always returns a Promise, even for synchronous operations. For pure sync flows, compose `map`/`chain`/`mapError` directly (see Synchronous Composition)
 - Type inference: Specify error types explicitly when needed: `Result<string, ApiError>`
 - Validation error format: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
-- Array operations: `sequence` stops at first failure; use `partitionResults` if you need all failures. Both accept `readonly` arrays
+- Array operations: `sequence` stops at first failure; use `partitionResults` if you need all failures. `sequence` and `traverse` accept `readonly` arrays; `partitionResults` takes a mutable array
 - mapError exists: Use `mapError` to transform error values, not `map` (which only transforms success values). A `mapError`/`tapError` handler must cover the full union of errors it may encounter
 - Error propagation: Once a failure occurs in a pipe, all subsequent operations are skipped
 - Default error type: `Result<T, E>` defaults `E` to `unknown`; `success(x)` types as `Result<T, never>`, which is assignable to any error type

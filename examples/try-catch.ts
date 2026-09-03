@@ -1,4 +1,4 @@
-// @docs: readme.md
+// @docs: readme.md, src/SKILL.md
 const sometimesThrows = (): unknown => {
   throw new Error('boom');
 };
@@ -22,6 +22,7 @@ const asyncResult = await tryCatch(async () => {
 // Transform errors for better context
 const result = await tryCatch(
   () => sometimesThrows(),
-  (error) => `Operation failed: ${error instanceof Error ? error.message : String(error)}`
+  (error) =>
+    `Operation failed: ${error instanceof Error ? error.message : String(error)}`
 );
 // @snippet-end
