@@ -410,9 +410,10 @@ if (isFailure(result)) {
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
 - **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures
 - **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values)
+- **Error widening**: `chain` unions its step's errors with the input's (`Result<T, E>` + step returning `Result<U, F>` → `Result<U, E | F>`); `map` and `tap` preserve the input error type
 - **Error propagation**: `pipe` invokes every operation even after a failure — `map`/`chain`/`tap` no-op on a failed Result (while `mapError`/`tapError` still run), which makes steps *appear* skipped
-- **Default error type**: If you don't specify the error type, it defaults to `unknown`
-- **Do NOT nest pipes**: nested calls bypass the typed overloads (ops degrade to `Result<any, E>`) and add needless Promise layers; to carry multiple values across steps, thread a state object (e.g. `{ user, orders }`) — use `map` to update it and `chain` for fallible steps
+- **Default error type**: `Result<T, E>` defaults `E` to `unknown`; `success(x)` types as `Result<T, never>`, which is assignable to any error type
+- **Do NOT nest pipes**: nested calls bypass the typed overloads (ops degrade to `Result<any, any>`) and add needless Promise layers; to carry multiple values across steps, thread a state object (e.g. `{ user, orders }`) — use `map` to update it and `chain` for fallible steps
 
 ## Common templates
 

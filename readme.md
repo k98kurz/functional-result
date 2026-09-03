@@ -113,6 +113,10 @@ const failedChain = chain(parseAndDouble)(abc);
 
 Note that this is primarily useful within `pipe`s (see below).
 
+Error types widen through `chain`: applying it to a `Result<T, E>` with a step
+that returns `Result<U, F>` produces `Result<U, E | F>`, so steps may introduce
+their own error types without casts.
+
 #### Side Effects with tap and tapError
 
 Use `tap` for side effects on success (e.g. logging) and `tapError` for side
@@ -452,7 +456,7 @@ const processUser = (user: User): Result<string, ApiError> => {
 - Array operations: `sequence` stops at first failure; use `partitionResults` if you need all failures
 - mapError exists: Use `mapError` to transform error values, not `map` (which only transforms success values)
 - Error propagation: Once a failure occurs in a pipe, all subsequent operations are skipped
-- Default error type: If you don't specify the error type, it defaults to `unknown`
+- Default error type: `Result<T, E>` defaults `E` to `unknown`; `success(x)` types as `Result<T, never>`, which is assignable to any error type
 
 ## CLI Tool
 

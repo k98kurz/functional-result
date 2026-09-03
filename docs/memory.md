@@ -1,5 +1,26 @@
 # Memory
 
+## Curried functions must not share one error generic across applications
+
+**Gotcha (2026-09-02):** A single `E` on a curried function binds at the first
+call: composing distinct error types hard-errors (TS2345), and `map`/`tap` —
+whose callbacks never mention `E` — silently collapse the error channel to
+`unknown`. `pipe`'s overloads carry one `E` through the whole chain, so the
+fix had to keep error-widening steps usable inside `pipe`.
+
+**Solution:** Split generics across applications: `chain` takes `<T, U, F>`
+(errors `fn` introduces) on the outer call and `<E>` (input errors) on the
+inner one, returning `Result<U, E | F>`; `map`, `tap`, and `getOrElse` take
+`E` on the inner function; `success` defaults `E = never` so a bare
+`success(x)` doesn't widen the union to `unknown`. Handlers that mention `E`
+(`mapError`, `tapError`, `match`, `fold`) need no change — assignability
+already accepts narrower input errors. Verify with type-level probes:
+Equal/Expect assertions plus `@ts-expect-error` guards for the must-stay-error
+cases, run with explicit-file `tsc` flags (no tsconfig covers `temp/`).
+Existing probes (`probe-curried-generics*.ts`) are gitignored and may not
+survive a clean checkout. For type-only fixes, emitted JS must be identical
+after stripping comments.
+
 ## Union-parameter inference in `tryCatch`
 
 **Gotcha (2026-09-02):** `tryCatch`'s original union parameter
