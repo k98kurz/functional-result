@@ -1,8 +1,7 @@
 // @docs: readme.md
-import { pipe, success, failure } from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
 // @snippet-start
-import { map, chain } from '@k98kurz/functional-result';
+import { pipe, map, chain, success, failure } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
 
 type User = { id: number; name: string };
 type ApiError = { code: string; message: string };

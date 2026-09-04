@@ -18,8 +18,24 @@ now survives only on SKILL-only standalones (`skill-api-call-wrapper`,
 `skill-batch-processing`, `skill-conversion-before/after`, `skill-unwrap`,
 `skill-validation-pipeline`); shared examples use the plain id. Doc fences must
 be edited together with the example region — edit the region in the `.ts` file
-first, then re-sync the fence (byte-exact replacement; the checker fails on any
-drift). `examples/illustrative/` holds intentionally non-compiling fragments,
+first, then run `npm run sync:examples` (`scripts/sync-examples.mjs`) to
+propagate it into the fences; it repairs MISMATCH findings only (examples are
+canonical, direction examples -> docs) and fails on structural contract
+violations. `npm run check:examples` still fails on any drift and remains the
+CI gate.
+
+**Script ownership (2026-09-04):** `scripts/check-examples.mjs` is strictly
+read-only — no write capability whether run directly or imported. It exports
+`analyzeExamples({ docs, examplesDir })` (paths injectable for tests; returns
+`{ counts, findings, docLines, mismatches }`) and `printFindings`.
+`scripts/sync-examples.mjs` owns every write: it exports
+`syncExamples(options)`, which repairs MISMATCH findings only (skips examples
+with `regionValid === false`), splices fences bottom-up per doc, writes, then
+re-runs the analysis from disk so returned findings are post-sync. This
+contract is pinned by `test/scripts-examples.test.mjs` (vitest; fixtures under
+gitignored `temp/`; tags `[C01]`–`[C09]`). Do not add repair logic or a fix
+flag back into the checker — that organization was deliberately reversed.
+`examples/illustrative/` holds intentionally non-compiling fragments,
 marked `// @no-compile`, excluded from tsc and eslint but still text-checked.
 
 **Example file format:** a `// @docs: <doc>[, <doc>...]` header listing
@@ -166,6 +182,7 @@ blocks are renamed.
 | Accessors | **A** | A01–A02 | `getOrElse`, `getOrThrow` — renamed from "Extraction" |
 | Edge Cases | **X** | X01–X04 | **X** for eXtreme / eXceptional |
 | Skill Export | **S** | S01–S07 | **S**kill export CLI tests |
+| Examples Scripts | **C** | C01–C09 | **C**heck/sync contract tests |
 
 ## JSDoc formatting conventions
 

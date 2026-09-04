@@ -2,7 +2,7 @@
 npm run test:dist && \
   npm run lint && \
   npm run typecheck && \
-  npm run format:check && \
+  npm run check:format && \
   npm run check:examples
 status=$?
 

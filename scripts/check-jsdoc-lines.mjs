@@ -55,7 +55,9 @@ for (const file of files) {
 }
 
 if (hasErrors) {
-  console.error('\n[JSDOC-LEN] Hard limit violations found — fix before committing.');
+  console.error(
+    '\n[JSDOC-LEN] Hard limit violations found — fix before committing.'
+  );
   process.exit(1);
 }
 

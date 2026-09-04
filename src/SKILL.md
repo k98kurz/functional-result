@@ -192,6 +192,11 @@ operations where you want to avoid Promise overhead, use `tryCatchSync`:
 ```typescript
 import { tryCatch } from '@k98kurz/functional-result';
 
+const sometimesThrows = (): unknown => {
+  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
+  return JSON.parse(input);
+};
+
 // Wrap synchronous operations
 const syncResult = await tryCatch(() => {
   const data = JSON.parse('{"valid": true}');
@@ -217,6 +222,11 @@ const result = await tryCatch(
 <!-- example: try-catch-sync -->
 ```typescript
 import { tryCatchSync } from '@k98kurz/functional-result';
+
+const sometimesThrows = (): unknown => {
+  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
+  return JSON.parse(input);
+};
 
 // Wrap synchronous operations (no await needed)
 const syncResult = tryCatchSync(() => {
@@ -419,6 +429,7 @@ application time, so unannotated parameters infer as `unknown`.
 <!-- example: get-or-else -->
 ```typescript
 import { getOrElse } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
 
 const successResult = success(42);
 const value = getOrElse(0)(successResult);
@@ -429,6 +440,7 @@ const fallback = getOrElse(0)(failureResult);
 // 0
 
 // defaults need not match the success type exactly (returns T | D):
+const maybeNullableResult: Result<string | null, Error> = success('x');
 const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
 ```
 
@@ -439,9 +451,10 @@ exception-based code:
 
 <!-- example: skill-unwrap -->
 ```typescript
-import { unwrapResult, tryCatch } from '@k98kurz/functional-result';
+import { unwrapResult } from '@k98kurz/functional-result';
 
-const result = await someFunctionReturnsResult();
+const someFunctionReturnsResult = (): Result<number, Error> => success(1);
+const result = someFunctionReturnsResult();
 
 // Throws if result is a failure
 const data = unwrapResult(result);
@@ -459,7 +472,14 @@ Note: When using `unwrapResult`, consider converting custom error types to prope
 
 <!-- example: map-error-stack-trace -->
 ```typescript
-const result = await someFunctionReturnsResult();
+import { mapError, unwrapResult, success } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+type CustomError = { message: string; stack?: string };
+const someFunctionReturnsResult = (): Result<string, CustomError> =>
+  success('x');
+
+const result = someFunctionReturnsResult();
 const ensureError = mapError((err: CustomError) => {
   const error = new Error(err.message);
   if (err.stack) error.stack = err.stack;

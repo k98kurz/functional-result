@@ -1,9 +1,11 @@
 // @docs: readme.md, src/SKILL.md
-const sometimesThrows = (): unknown => {
-  throw new Error('boom');
-};
 // @snippet-start
 import { tryCatch } from '@k98kurz/functional-result';
+
+const sometimesThrows = (): unknown => {
+  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
+  return JSON.parse(input);
+};
 
 // Wrap synchronous operations
 const syncResult = await tryCatch(() => {

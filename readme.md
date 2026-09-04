@@ -189,6 +189,7 @@ Use `getOrElse` to unwrap a result with a fallback value on failure:
 <!-- example: get-or-else -->
 ```typescript
 import { getOrElse } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
 
 const successResult = success(42);
 const value = getOrElse(0)(successResult);
@@ -199,6 +200,7 @@ const fallback = getOrElse(0)(failureResult);
 // 0
 
 // defaults need not match the success type exactly (returns T | D):
+const maybeNullableResult: Result<string | null, Error> = success('x');
 const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
 ```
 
@@ -411,6 +413,11 @@ existing code that uses exceptions. However, it must be used with `await`:
 ```typescript
 import { tryCatch } from '@k98kurz/functional-result';
 
+const sometimesThrows = (): unknown => {
+  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
+  return JSON.parse(input);
+};
+
 // Wrap synchronous operations
 const syncResult = await tryCatch(() => {
   const data = JSON.parse('{"valid": true}');
@@ -444,6 +451,11 @@ can't use `await`:
 ```typescript
 import { tryCatchSync } from '@k98kurz/functional-result';
 
+const sometimesThrows = (): unknown => {
+  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
+  return JSON.parse(input);
+};
+
 // Wrap synchronous operations (no await needed)
 const syncResult = tryCatchSync(() => {
   const data = JSON.parse('{"valid": true}');
@@ -472,10 +484,13 @@ convert a `Result` back to standard exception-based code:
 
 <!-- example: unwrap-get-orthrow -->
 ```typescript
-import { tryCatch, unwrapResult, getOrThrow } from '@k98kurz/functional-result';
+import { unwrapResult, getOrThrow, success } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+const someFunctionReturnsResult = (): Result<number, Error> => success(1);
 
 // Convert Result-based code to use standard try-catch
-const result = await someFunctionReturnsResult();
+const result = someFunctionReturnsResult();
 const data = unwrapResult(result); // throws if not success
 
 // Or use the alias
@@ -487,7 +502,14 @@ convert it before calling `unwrapResult` to ensure proper stack trace support:
 
 <!-- example: map-error-stack-trace -->
 ```typescript
-const result = await someFunctionReturnsResult();
+import { mapError, unwrapResult, success } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+type CustomError = { message: string; stack?: string };
+const someFunctionReturnsResult = (): Result<string, CustomError> =>
+  success('x');
+
+const result = someFunctionReturnsResult();
 const ensureError = mapError((err: CustomError) => {
   const error = new Error(err.message);
   if (err.stack) error.stack = err.stack;
@@ -532,7 +554,8 @@ if (isFailure(result)) {
 
 <!-- example: complex-type-transform -->
 ```typescript
-import { map, chain } from '@k98kurz/functional-result';
+import { pipe, map, chain, success, failure } from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
 
 type User = { id: number; name: string };
 type ApiError = { code: string; message: string };

@@ -19,26 +19,24 @@
  *   must be marked `// @no-compile`; they are still text-checked here.
  *
  * Every finding is a hard error; the script exits 1 if any are reported.
+ * This module is strictly read-only: it performs no writes whether run
+ * directly or imported. scripts/sync-examples.mjs imports analyzeExamples to
+ * repair MISMATCH findings by copying the canonical example region over the
+ * doc fence; structural findings are never auto-fixed.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const DOCS = ['readme.md', 'src/SKILL.md'];
-const EXAMPLES_DIR = 'examples';
+const DEFAULT_DOCS = ['readme.md', 'src/SKILL.md'];
+const DEFAULT_EXAMPLES_DIR = 'examples';
 const SENTINEL_RE = /^<!--\s*example:\s*([a-z0-9-]+)\s*-->\s*$/;
-
-const errors = [];
-const counts = { tsFences: 0, otherFences: 0, examples: 0 };
-
-function err(file, line, code, msg) {
-  errors.push({ file, line, code, msg });
-}
 
 function norm(s) {
   return s
     .replace(/\r\n/g, '\n')
     .split('\n')
-    .map((l) => l.replace(/\s+$/, ''))
+    .map(l => l.replace(/\s+$/, ''))
     .join('\n')
     .replace(/^\n+|\n+$/, '');
 }
@@ -53,7 +51,7 @@ function findTsFiles(dir) {
   return out;
 }
 
-function parseDoc(file) {
+function parseDoc(file, err) {
   const lines = readFileSync(file, 'utf8').split('\n');
   const fences = [];
   let open = false;
@@ -75,7 +73,12 @@ function parseDoc(file) {
     }
   }
   if (open) {
-    err(file, cur.startLine, 'UNBALANCED_FENCE', `fence opened at line ${cur.startLine} (lang "${cur.lang}") is never closed`);
+    err(
+      file,
+      cur.startLine,
+      'UNBALANCED_FENCE',
+      `fence opened at line ${cur.startLine} (lang "${cur.lang}") is never closed`
+    );
   }
   return { fences, lines };
 }
@@ -96,139 +99,272 @@ function findSentinelAbove(lines, idx) {
   return null;
 }
 
-// ---- parse docs ----
-const docResults = {};
-for (const doc of DOCS) {
-  let parsed;
-  try {
-    parsed = parseDoc(doc);
-  } catch (e) {
-    err(doc, 1, 'BAD_METADATA', `cannot read doc: ${e.message}`);
-    continue;
-  }
-  const { fences, lines } = parsed;
-  const sentinels = new Map();
-  lines.forEach((line, i) => {
-    const m = line.match(SENTINEL_RE);
-    if (m) sentinels.set(i + 1, m[1]);
-  });
-  const used = new Set();
-  for (const f of fences) {
-    if (f.lang === 'typescript') {
-      counts.tsFences++;
-      const sid = findSentinelAbove(lines, f.startLine - 1);
-      if (!sid) {
-        err(doc, f.startLine, 'FENCE_NO_SENTINEL', `typescript fence at line ${f.startLine} has no '<!-- example: <id> -->' sentinel above it`);
+/**
+ * Pure, read-only analysis of docs vs examples. Returns everything a caller
+ * needs to verify the contract or to compute repairs:
+ * - counts: scanned docs list plus fence/example tallies
+ * - findings: every contract violation (file, line, code, msg)
+ * - docLines: raw line arrays per doc (repair input)
+ * - mismatches: drifted fences with the canonical replacement data
+ */
+export function analyzeExamples({
+  docs = DEFAULT_DOCS,
+  examplesDir = DEFAULT_EXAMPLES_DIR,
+} = {}) {
+  const findings = [];
+  const err = (file, line, code, msg) =>
+    findings.push({ file, line, code, msg });
+  const counts = { docs: [...docs], tsFences: 0, otherFences: 0, examples: 0 };
+  const mismatches = [];
+
+  // ---- parse docs ----
+  const docResults = {};
+  const docLines = {};
+  for (const doc of docs) {
+    let parsed;
+    try {
+      parsed = parseDoc(doc, err);
+    } catch (e) {
+      err(doc, 1, 'BAD_METADATA', `cannot read doc: ${e.message}`);
+      continue;
+    }
+    const { fences, lines } = parsed;
+    docLines[doc] = lines;
+    const sentinels = new Map();
+    lines.forEach((line, i) => {
+      const m = line.match(SENTINEL_RE);
+      if (m) sentinels.set(i + 1, m[1]);
+    });
+    const used = new Set();
+    for (const f of fences) {
+      if (f.lang === 'typescript') {
+        counts.tsFences++;
+        const sid = findSentinelAbove(lines, f.startLine - 1);
+        if (!sid) {
+          err(
+            doc,
+            f.startLine,
+            'FENCE_NO_SENTINEL',
+            `typescript fence at line ${f.startLine} has no '<!-- example: <id> -->' sentinel above it`
+          );
+        } else {
+          used.add(sid.lineNo);
+          f.id = sid.id;
+          f.sentinelLine = sid.lineNo;
+        }
       } else {
-        used.add(sid.lineNo);
-        f.id = sid.id;
-        f.sentinelLine = sid.lineNo;
+        counts.otherFences++;
       }
-    } else {
-      counts.otherFences++;
+    }
+    sentinels.forEach((id, lineNo) => {
+      if (!used.has(lineNo)) {
+        err(
+          doc,
+          lineNo,
+          'SENTINEL_NO_FENCE',
+          `sentinel '<!-- example: ${id} -->' at line ${lineNo} is not followed by a typescript fence`
+        );
+      }
+    });
+    const seen = new Map();
+    for (const f of fences) {
+      if (!f.id) continue;
+      if (seen.has(f.id))
+        err(
+          doc,
+          f.startLine,
+          'DUP_ID',
+          `sentinel id "${f.id}" used at lines ${seen.get(f.id)} and ${f.startLine}`
+        );
+      else seen.set(f.id, f.startLine);
+    }
+    docResults[doc] = fences.filter(f => f.id);
+  }
+
+  // ---- parse examples ----
+  const exampleInfo = new Map();
+  const exampleFiles = findTsFiles(examplesDir);
+  counts.examples = exampleFiles.length;
+  for (const file of exampleFiles) {
+    const id = basename(file, '.ts');
+    const lines = readFileSync(file, 'utf8').split('\n');
+    let docs = null;
+    let noCompile = false;
+    let startIdx = -1;
+    let endIdx = -1;
+    let regionValid = true;
+    for (let i = 0; i < lines.length; i++) {
+      const dm = lines[i].match(/\/\/\s*@docs:\s*(.+?)\s*$/);
+      if (dm)
+        docs = dm[1]
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+      if (/\/\/\s*@no-compile\s*$/.test(lines[i])) noCompile = true;
+      if (/\/\/\s*@snippet-start\s*$/.test(lines[i])) {
+        if (startIdx !== -1) {
+          err(file, i + 1, 'MULTI_REGION', 'multiple @snippet-start markers');
+          regionValid = false;
+        }
+        startIdx = i;
+      }
+      if (/\/\/\s*@snippet-end\s*$/.test(lines[i])) endIdx = i;
+    }
+    if (startIdx === -1 || endIdx === -1) {
+      err(
+        file,
+        1,
+        'NO_REGION',
+        'example missing @snippet-start/@snippet-end region markers'
+      );
+      regionValid = false;
+    } else if (startIdx > endIdx) {
+      err(
+        file,
+        startIdx + 1,
+        'NO_REGION',
+        '@snippet-start appears after @snippet-end'
+      );
+      regionValid = false;
+    } else if (endIdx - startIdx <= 1) {
+      err(file, startIdx + 1, 'EMPTY_REGION', 'snippet region is empty');
+      regionValid = false;
+    }
+    if (!docs || docs.length === 0)
+      err(
+        file,
+        1,
+        'NO_METADATA',
+        'example missing a "// @docs:" registered-locations header'
+      );
+    const illustrative =
+      file.includes(`/${'illustrative'}/`) ||
+      file.startsWith(`examples${'illustrative'}/`);
+    if (illustrative && !noCompile)
+      err(
+        file,
+        1,
+        'ILLUSTRATIVE_MARKER',
+        'illustrative example must be marked "// @no-compile"'
+      );
+    if (!illustrative && noCompile)
+      err(
+        file,
+        1,
+        'ILLUSTRATIVE_MARKER',
+        'non-illustrative example must not be marked "// @no-compile"'
+      );
+    const regionLines =
+      startIdx !== -1 && endIdx !== -1 && startIdx < endIdx
+        ? lines.slice(startIdx + 1, endIdx)
+        : [];
+    const region = regionLines.join('\n');
+    exampleInfo.set(id, {
+      file,
+      docs: docs || [],
+      region,
+      regionLines,
+      regionValid,
+      regionStartLine: startIdx + 2,
+      illustrative,
+    });
+  }
+
+  // ---- cross-reference: example metadata vs doc sentinels ----
+  for (const [id, ex] of exampleInfo) {
+    for (const doc of ex.docs) {
+      const list = docResults[doc];
+      if (!list) {
+        err(
+          ex.file,
+          1,
+          'BAD_METADATA',
+          `@docs references unknown doc "${doc}"`
+        );
+        continue;
+      }
+      if (!list.some(f => f.id === id)) {
+        err(
+          ex.file,
+          1,
+          'MISSING_LOCATION',
+          `"${id}" is registered for ${doc} but no '<!-- example: ${id} -->' sentinel exists in ${doc}`
+        );
+      }
     }
   }
-  sentinels.forEach((id, lineNo) => {
-    if (!used.has(lineNo)) {
-      err(doc, lineNo, 'SENTINEL_NO_FENCE', `sentinel '<!-- example: ${id} -->' at line ${lineNo} is not followed by a typescript fence`);
+  for (const doc of docs) {
+    for (const f of docResults[doc] || []) {
+      const ex = exampleInfo.get(f.id);
+      if (!ex) {
+        err(
+          doc,
+          f.sentinelLine,
+          'UNKNOWN_ID',
+          `sentinel '<!-- example: ${f.id} -->' has no corresponding file ${examplesDir}/${f.id}.ts`
+        );
+        continue;
+      }
+      if (!ex.docs.includes(doc)) {
+        err(
+          doc,
+          f.sentinelLine,
+          'UNEXPECTED_LOCATION',
+          `"${f.id}" appears in ${doc} but its @docs metadata does not list ${doc}`
+        );
+      }
+      const nb = norm(f.body);
+      const nr = norm(ex.region);
+      if (nb !== nr) {
+        const a = nb.split('\n');
+        const b = nr.split('\n');
+        let di = 0;
+        while (di < a.length && di < b.length && a[di] === b[di]) di++;
+        err(
+          doc,
+          f.startLine,
+          'MISMATCH',
+          `content in ${doc} (fence at line ${f.startLine}) does not match ${ex.file} (region from line ${ex.regionStartLine}); first difference at ${doc} line ${f.startLine + di + 1} vs ${ex.file} line ${ex.regionStartLine + di + 1}`
+        );
+        mismatches.push({ doc, fence: f, example: ex });
+      }
     }
-  });
-  const seen = new Map();
-  for (const f of fences) {
-    if (!f.id) continue;
-    if (seen.has(f.id)) err(doc, f.startLine, 'DUP_ID', `sentinel id "${f.id}" used at lines ${seen.get(f.id)} and ${f.startLine}`);
-    else seen.set(f.id, f.startLine);
   }
-  docResults[doc] = fences.filter((f) => f.id);
+
+  return { counts, findings, docLines, mismatches };
 }
 
-// ---- parse examples ----
-const exampleInfo = new Map();
-const exampleFiles = findTsFiles(EXAMPLES_DIR);
-counts.examples = exampleFiles.length;
-for (const file of exampleFiles) {
-  const id = basename(file, '.ts');
-  const lines = readFileSync(file, 'utf8').split('\n');
-  let docs = null;
-  let noCompile = false;
-  let startIdx = -1;
-  let endIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const dm = lines[i].match(/\/\/\s*@docs:\s*(.+?)\s*$/);
-    if (dm) docs = dm[1].split(',').map((s) => s.trim()).filter(Boolean);
-    if (/\/\/\s*@no-compile\s*$/.test(lines[i])) noCompile = true;
-    if (/\/\/\s*@snippet-start\s*$/.test(lines[i])) {
-      if (startIdx !== -1) err(file, i + 1, 'MULTI_REGION', 'multiple @snippet-start markers');
-      startIdx = i;
-    }
-    if (/\/\/\s*@snippet-end\s*$/.test(lines[i])) endIdx = i;
+export function printFindings(findings, counts) {
+  const byCode = {};
+  for (const e of findings) {
+    byCode[e.code] = (byCode[e.code] || 0) + 1;
+    console.log(`${e.file}:${e.line} [${e.code}] ${e.msg}`);
   }
-  if (startIdx === -1 || endIdx === -1) {
-    err(file, 1, 'NO_REGION', 'example missing @snippet-start/@snippet-end region markers');
-  } else if (startIdx > endIdx) {
-    err(file, startIdx + 1, 'NO_REGION', '@snippet-start appears after @snippet-end');
-  } else if (endIdx - startIdx <= 1) {
-    err(file, startIdx + 1, 'EMPTY_REGION', 'snippet region is empty');
-  }
-  if (!docs || docs.length === 0) err(file, 1, 'NO_METADATA', 'example missing a "// @docs:" registered-locations header');
-  const illustrative = file.includes(`/${'illustrative'}/`) || file.startsWith(`examples${'illustrative'}/`);
-  if (illustrative && !noCompile) err(file, 1, 'ILLUSTRATIVE_MARKER', 'illustrative example must be marked "// @no-compile"');
-  if (!illustrative && noCompile) err(file, 1, 'ILLUSTRATIVE_MARKER', 'non-illustrative example must not be marked "// @no-compile"');
-  const region = lines.slice(startIdx + 1, endIdx).join('\n');
-  exampleInfo.set(id, { file, docs: docs || [], region, regionStartLine: startIdx + 2, illustrative });
-}
-
-// ---- cross-reference: example metadata vs doc sentinels ----
-for (const [id, ex] of exampleInfo) {
-  for (const doc of ex.docs) {
-    const list = docResults[doc];
-    if (!list) {
-      err(ex.file, 1, 'BAD_METADATA', `@docs references unknown doc "${doc}"`);
-      continue;
-    }
-    if (!list.some((f) => f.id === id)) {
-      err(ex.file, 1, 'MISSING_LOCATION', `"${id}" is registered for ${doc} but no '<!-- example: ${id} -->' sentinel exists in ${doc}`);
-    }
-  }
-}
-for (const doc of DOCS) {
-  for (const f of docResults[doc] || []) {
-    const ex = exampleInfo.get(f.id);
-    if (!ex) {
-      err(doc, f.sentinelLine, 'UNKNOWN_ID', `sentinel '<!-- example: ${f.id} -->' has no corresponding file ${EXAMPLES_DIR}/${f.id}.ts`);
-      continue;
-    }
-    if (!ex.docs.includes(doc)) {
-      err(doc, f.sentinelLine, 'UNEXPECTED_LOCATION', `"${f.id}" appears in ${doc} but its @docs metadata does not list ${doc}`);
-    }
-    const nb = norm(f.body);
-    const nr = norm(ex.region);
-    if (nb !== nr) {
-      const a = nb.split('\n');
-      const b = nr.split('\n');
-      let di = 0;
-      while (di < a.length && di < b.length && a[di] === b[di]) di++;
-      err(doc, f.startLine, 'MISMATCH', `content in ${doc} (fence at line ${f.startLine}) does not match ${ex.file} (region from line ${ex.regionStartLine}); first difference at ${doc} line ${f.startLine + di + 1} vs ${ex.file} line ${ex.regionStartLine + di + 1}`);
-    }
+  console.log('\nsummary:');
+  console.log(`  docs scanned: ${counts.docs.join(', ')}`);
+  console.log(
+    `  typescript fences: ${counts.tsFences} (non-ts ignored: ${counts.otherFences})`
+  );
+  console.log(`  example files: ${counts.examples}`);
+  console.log(`  errors: ${findings.length}`);
+  for (const [code, n] of Object.entries(byCode).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  )) {
+    console.log(`    ${code}: ${n}`);
   }
 }
 
-// ---- report ----
-const byCode = {};
-for (const e of errors) {
-  byCode[e.code] = (byCode[e.code] || 0) + 1;
-  console.log(`${e.file}:${e.line} [${e.code}] ${e.msg}`);
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  const { counts, findings } = analyzeExamples();
+  printFindings(findings, counts);
+  if (findings.length > 0) {
+    console.error('\n[CHECK-EXAMPLES] errors found — fix before committing.');
+    process.exit(1);
+  }
+  console.log(
+    '[CHECK-EXAMPLES] all examples match their registered doc locations.'
+  );
 }
-console.log('\nsummary:');
-console.log(`  docs scanned: ${DOCS.join(', ')}`);
-console.log(`  typescript fences: ${counts.tsFences} (non-ts ignored: ${counts.otherFences})`);
-console.log(`  example files: ${counts.examples}`);
-console.log(`  errors: ${errors.length}`);
-for (const [code, n] of Object.entries(byCode).sort((a, b) => a[0].localeCompare(b[0]))) {
-  console.log(`    ${code}: ${n}`);
-}
-if (errors.length > 0) {
-  console.error('\n[CHECK-EXAMPLES] errors found — fix before committing.');
-  process.exit(1);
-}
-console.log('[CHECK-EXAMPLES] all examples match their registered doc locations.');
