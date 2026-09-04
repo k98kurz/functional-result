@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { analyzeExamples, printFindings } from '../scripts/check-examples.mjs';
 import { syncExamples } from '../scripts/sync-examples.mjs';
 
@@ -22,6 +22,7 @@ async function writeFixture({ doc = null, examples = {} }) {
   await mkdir(examplesDir, { recursive: true });
   if (doc !== null) await writeFile(docPath, doc);
   for (const [name, content] of Object.entries(examples)) {
+    await mkdir(dirname(join(examplesDir, name)), { recursive: true });
     await writeFile(join(examplesDir, name), content.replaceAll('{{DOC}}', docPath));
   }
   return { dir, docPath, examplesDir };
@@ -202,5 +203,49 @@ describe('examples scripts (check/sync)', () => {
       { encoding: 'utf8' },
     );
     expect(out).toBe('');
+  });
+
+  it('[C10] illustrative detection enforces the // @no-compile marker', async () => {
+    const fx = await writeFixture({
+      doc:
+        docSrc('marked', ['const x: NotAType = 1;']) +
+        docSrc('unmarked', ['const y: NotAType = 2;']) +
+        docSrc('plain-marked', ['const z = 3;']),
+      examples: {
+        'illustrative/marked.ts':
+          '// @no-compile\n' + exampleSrc(['const x: NotAType = 1;']),
+        'illustrative/unmarked.ts': exampleSrc(['const y: NotAType = 2;']),
+        'plain-marked.ts': '// @no-compile\n' + exampleSrc(['const z = 3;']),
+      },
+    });
+    const { findings } = analyze(fx);
+    const marker = findings.filter((f) => f.code === 'ILLUSTRATIVE_MARKER');
+    expect(marker.map((f) => basename(f.file)).sort()).toEqual([
+      'plain-marked.ts',
+      'unmarked.ts',
+    ]);
+    expect(findings.filter((f) => f.code !== 'ILLUSTRATIVE_MARKER')).toEqual([]);
+  });
+
+  it('[C11] illustrative detection is path-segment based, not prefix based', async () => {
+    const dir = await mkdtemp(join(TEMP_ROOT, 'seg-'));
+    const examplesDir = join(dir, 'examplesillustrative');
+    await mkdir(examplesDir, { recursive: true });
+    await writeFile(join(dir, 'readme.md'), docSrc('plain', ['const a = 1;']));
+    await writeFile(
+      join(examplesDir, 'plain.ts'),
+      exampleSrc(['const a = 1;']).replaceAll('{{DOC}}', 'readme.md'),
+    );
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const { findings } = analyzeExamples({
+        docs: ['readme.md'],
+        examplesDir: 'examplesillustrative',
+      });
+      expect(findings).toEqual([]);
+    } finally {
+      process.chdir(cwd);
+    }
   });
 });

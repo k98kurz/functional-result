@@ -237,9 +237,7 @@ export function analyzeExamples({
         'NO_METADATA',
         'example missing a "// @docs:" registered-locations header'
       );
-    const illustrative =
-      file.includes(`/${'illustrative'}/`) ||
-      file.startsWith(`examples${'illustrative'}/`);
+    const illustrative = file.split(/[\\/]/).includes('illustrative');
     if (illustrative && !noCompile)
       err(
         file,
