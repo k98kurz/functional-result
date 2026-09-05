@@ -18,6 +18,7 @@ import {
   getOrElse,
   getOrThrow,
   pipe,
+  pipeSync,
   tap,
   tapError,
   type Result,
@@ -607,6 +608,57 @@ describe('Composition', () => {
     );
     expect(mixed.success).toBe(true);
     expect(unwrapResult(mixed)).toBe(11);
+  });
+
+  it('[P17] pipeSync composes operations in order, no await', () => {
+    const result = pipeSync(
+      success<number, string>(5),
+      map((x: number) => x * 2),
+      chain((x: number) => success<string, string>(x.toString())),
+      map((s: string) => `${s}_processed`)
+    );
+    expect(result.success).toBe(true);
+    expect(unwrapResult(result)).toBe('10_processed');
+  });
+
+  it('[P18] pipeSync failure: every op runs; map no-op, error ops run', () => {
+    const successEffects: number[] = [];
+    const errorEffects: string[] = [];
+    const result = pipeSync(
+      failure<number, string>('initial error'),
+      map((x: number) => {
+        successEffects.push(x);
+        return x;
+      }),
+      tap((x: number) => {
+        successEffects.push(x);
+      }),
+      tapError((e: string) => {
+        errorEffects.push(e);
+      }),
+      mapError((e: string) => e.toUpperCase()),
+      tapError((e: string) => {
+        errorEffects.push(e);
+      })
+    );
+    expect(successEffects).toEqual([]);
+    expect(errorEffects).toEqual(['initial error', 'INITIAL ERROR']);
+    expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
+    expect(result.error).toBe('INITIAL ERROR');
+  });
+
+  it('[P19] pipeSync with zero ops returns initial unchanged', () => {
+    const initial = success<number, string>(42);
+    const result = pipeSync(initial);
+    expect(result === initial).toBe(true);
+  });
+
+  it('[P20] pipeSync.untyped composes a runtime-built operation array', () => {
+    const ops = [map((x: number) => x * 2), map((x: number) => x + 1)];
+    const result = pipeSync.untyped(success<number, string>(5), ...ops);
+    expect(result.success).toBe(true);
+    expect(unwrapResult(result)).toBe(11);
   });
 });
 

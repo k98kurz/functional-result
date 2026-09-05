@@ -19,6 +19,16 @@
   performs no step-by-step typing, returning `Promise<Result<any, any>>`, while
   still validating that the initial value is a Result. For statically known
   pipelines prefer `pipe`
+- Added `pipeSync(initial, ...operations)` — the synchronous twin of `pipe`. It
+  composes unary Result-to-Result operations left-to-right and returns the final
+  `Result` directly, with no `Promise` wrapper and no `await`. Promise-returning
+  operations and a `Promise<Result>` initial are compile errors. Typed through 10
+  operations, then a fallback overload types longer chains as `Result<any, any>`
+- Added `pipeSync.untyped(initial, ...operations)` for composing a synchronous
+  pipeline from a runtime-built array of operations (e.g.
+  `pipeSync.untyped(start, ...ops)`). It performs no step-by-step typing,
+  returning `Result<any, any>`, while still validating that the initial value is
+  a Result
 - Fixed `tryCatch` type inference: promise-returning thunks now bind `T` to the
   awaited value instead of `Promise<T>` (type-level fix, runtime unchanged)
 - Fixed curried generics for `chain`, `map`, and `tap`: the error type is no

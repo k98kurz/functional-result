@@ -48,6 +48,13 @@ imperative fragments in a function instead of top-level `try`/`return`. Keep
 every line ≤ 85 chars (`max-len` covers `examples/**`); prettier deliberately
 does NOT cover `examples/` (reformatting would desync verbatim regions).
 
+**Example id case convention (2026-09-05):** sentinel ids must be lowercase
+`[a-z0-9-]+` (SENTINEL_RE in `scripts/check-examples.mjs`). camelCase API names
+map to kebab-case ids — `tryCatchSync` → `try-catch-sync`, so `pipeSync` →
+`pipe-sync` and `pipeSync.untyped` → `pipe-sync-untyped`. Ticket 01 initially
+proposed `pipeSync-*` sentinels, which the checker rejected for the uppercase.
+Reuse for ticket 02 (`flowSync` → `flow-sync`).
+
 ## Curried functions: split generics for every channel across applications
 
 **Gotcha (2026-09-02; success-channel gap found 2026-09-03):** A generic on a
@@ -157,7 +164,7 @@ blocks are renamed.
 | Constructors & Type Guards | **B** | B01–B06 | **B**asics — fundamental building blocks |
 | Error Handling | **E** | E01–E09 | — |
 | Transformations | **T** | T01–T07 | — |
-| Composition | **P** | P01–P09 | **P**ipe is the headline feature of this block |
+| Composition | **P** | P01–P20 | **P**ipe is the headline feature of this block |
 | Collections | **L** | L01–L08 | **L**ists / coL**L**ections |
 | Validation | **V** | V01–V02 | — |
 | Accessors | **A** | A01–A02 | `getOrElse`, `getOrThrow` — renamed from "Extraction" |
@@ -232,8 +239,9 @@ match. Ops beyond the tenth go unchecked.
 **`pipe.untyped`:** sanctioned path for fully dynamic composition (spreading
 a runtime-built op array, which the hardened overloads reject). Attached via
 function/namespace declaration merging; initial value typed precisely, ops
-and result permissive. Needs a local `// eslint-disable` (`no-namespace`,
-`no-redeclare`).
+and result permissive. Needs a local `// eslint-disable` for `no-namespace`
+(function/namespace merging does not trigger `no-redeclare` in the current
+config).
 
 **Lessons:**
 - Only declared overloads are visible to callers — a rest-args implementation

@@ -28,6 +28,7 @@ import {
   success,
   failure,
   pipe,
+  pipeSync,
 } from '../src/functional-result';
 import type { Result, ValidationError } from '../src/functional-result';
 import { describe, expect, it } from 'vitest';
@@ -297,6 +298,116 @@ async function pipeUntypedProbe(): Promise<void> {
   // @ts-expect-error pipe.untyped requires a Result (or Promise<Result>) initial
   pipe.untyped(42, pipeMap);
 }
+
+/* ---------------------------------------------------------------- */
+/* pipeSync: sync twin of pipe - no Promise, 10-op boundary          */
+/* ---------------------------------------------------------------- */
+
+// zero ops returns the initial Result unchanged (still not a Promise)
+const ps0 = pipeSync(start);
+const _ps0: Expect<Equal<typeof ps0, Result<number, E1>>> = true;
+
+// basic composition yields Result<number, E1>, NOT Promise<Result<...>>
+const ps1 = pipeSync(start, pipeMap);
+const _ps1: Expect<Equal<typeof ps1, Result<number, E1>>> = true;
+
+// chain widens errors across steps; map preserves the error channel
+const psChain = pipeSync(
+  start,
+  chain((n: number) => success<string, E2>(String(n)))
+);
+const _psChain: Expect<Equal<typeof psChain, Result<string, E1 | E2>>> = true;
+
+const psMap = pipeSync(
+  start,
+  map((n: number) => n * 2)
+);
+const _psMap: Expect<Equal<typeof psMap, Result<number, E1>>> = true;
+
+// Promise-returning operations are rejected at compile time
+// @ts-expect-error pipeSync rejects Promise-returning operations
+pipeSync(start, async (r: Result<number, E1>) => r);
+
+// a Promise<Result> initial is rejected (nothing can be awaited)
+// @ts-expect-error pipeSync requires a Result initial, not Promise<Result>
+pipeSync(Promise.resolve(start), pipeMap);
+
+// the catch-all fallback must NOT swallow type errors in short chains:
+// a mismatch among the first 10 operations stays a compile error.
+const badSyncShort = pipeSync(
+  start,
+  // @ts-expect-error map callback is typed for string, but start is Result<number, E1>
+  map((s: string) => s.length)
+);
+void badSyncShort;
+
+// a mismatch at slot 3 of a 13-op chain is also caught (first 10 checked).
+const badSyncLong = pipeSync(
+  start,
+  pipeMap,
+  pipeMap,
+  // @ts-expect-error op 3 is typed for string, but prior steps yield Result<number, E1>
+  map((s: string) => s.length),
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap
+);
+
+// 10-op boundary keeps types; 11+ falls back to the catch-all
+function pipeSyncBoundary(): void {
+  const ps10 = pipeSync(
+    start,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const _ps10: Expect<Equal<typeof ps10, Result<number, E1>>> = true;
+
+  const ps11 = pipeSync(
+    start,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const _ps11: Expect<Equal<typeof ps11, Result<any, any>>> = true;
+  void _ps10;
+  void _ps11;
+}
+
+/* ---------------------------------------------------------------- */
+/* pipeSync.untyped: dynamic sync composition without step typing    */
+/* ---------------------------------------------------------------- */
+
+// composes a runtime-built op array synchronously; result degrades
+const untypedSyncOps = [pipeMap, pipeMap, pipeMap];
+const psu = pipeSync.untyped(start, ...untypedSyncOps);
+const _psu: Expect<Equal<typeof psu, Result<any, any>>> = true;
+
+// rejects a non-Result initial value
+// @ts-expect-error pipeSync.untyped requires a Result initial
+pipeSync.untyped(42, pipeMap);
 
 describe('type-level assertions', () => {
   it('compiles the type assertions (the real checks run under tsc)', () => {

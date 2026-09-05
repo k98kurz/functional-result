@@ -120,13 +120,19 @@ const processInvalid = await pipe(
 // Result: { success: false, error: 'Invalid number' }
 ```
 
-`pipe` always returns a `Promise`. For pure synchronous flows, compose the
-curried combinators directly instead — no `Promise` wrapper, same typed error
-channel:
+`pipe` always returns a `Promise`. For pure synchronous flows, use `pipeSync`,
+its synchronous twin — the same flat, left-to-right shape as `pipe` but it
+returns the final `Result` directly, with no `Promise` wrapper:
 
-<!-- example: sync-composition -->
+<!-- example: pipe-sync-composition -->
 ```typescript
-import { chain, failure, mapError, success } from '@k98kurz/functional-result';
+import {
+  chain,
+  failure,
+  mapError,
+  pipeSync,
+  success,
+} from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
 
 type ParseError = { code: string };
@@ -140,17 +146,24 @@ const parse = (input: string): Result<number, ParseError> => {
 const checkRange = (n: number): Result<number, ApiError> =>
   n > 100 ? failure({ code: 'range', message: `${n} is out of range` }) : success(n);
 
-// a synchronous multi-step flow, with a typed error channel throughout
 const toApiError = (e: ParseError): ApiError => ({
   code: e.code,
   message: 'Invalid input'
 });
 
 const processInput = (input: string): Result<number, ApiError> =>
-  chain(checkRange)(mapError(toApiError)(parse(input)));
+  pipeSync(
+    parse(input),
+    mapError(toApiError),
+    chain(checkRange)
+  );
 
 const result = processInput('21'); // { success: true, data: 21 }
 ```
+
+The curried combinators compose directly as the underlying primitive, but
+`pipeSync` keeps the same flat, left-to-right DX as `pipe` without forcing
+`async`/`await` into an all-sync chain.
 
 ### Side effects with tap and tapError
 
@@ -517,10 +530,10 @@ if (isFailure(result)) {
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
 - **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead. `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`)
-- **Sync composition**: `pipe` is async-only; for pure sync flows, compose `map`/`chain`/`mapError` directly without the `Promise` wrapper
+- **Sync composition**: `pipe` is async-only; for pure sync flows use `pipeSync` (returns the `Result` directly, no `Promise` wrapper). The curried combinators also compose directly without the `Promise` wrapper
 - **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
-- **pipe op limit**: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked
-- **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array
+- **pipe op limit**: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked. `pipeSync` mirrors the same 10-op boundary, falling back to `Result<any, any>`
+- **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array. For sync-only flows, `pipeSync.untyped` is the synchronous equivalent, returning `Result<any, any>`
 - **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
 - **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`

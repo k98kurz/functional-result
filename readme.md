@@ -263,16 +263,24 @@ const result = await pipe.untyped(success(5), ...ops);
 // { success: true, data: 11 }
 ```
 
-#### Synchronous Composition (without pipe)
+#### Synchronous Composition (pipeSync)
 
 `pipe` always returns a `Promise`, even when every step is synchronous. For
 pure synchronous flows — where you don't want to introduce `async`/`await` into
-the call chain — compose the combinators directly instead. The curried
-combinators compose like ordinary functions:
+the call chain — use `pipeSync`, the synchronous twin of `pipe`. It composes the
+same unary Result operations left-to-right but returns the final `Result`
+directly, with no `Promise` wrapper. (The curried combinators compose directly
+too, but `pipeSync` gives the same flat, left-to-right shape as `pipe`.)
 
-<!-- example: sync-composition -->
+<!-- example: pipe-sync-composition -->
 ```typescript
-import { chain, failure, mapError, success } from '@k98kurz/functional-result';
+import {
+  chain,
+  failure,
+  mapError,
+  pipeSync,
+  success,
+} from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
 
 type ParseError = { code: string };
@@ -286,21 +294,40 @@ const parse = (input: string): Result<number, ParseError> => {
 const checkRange = (n: number): Result<number, ApiError> =>
   n > 100 ? failure({ code: 'range', message: `${n} is out of range` }) : success(n);
 
-// a synchronous multi-step flow, with a typed error channel throughout
 const toApiError = (e: ParseError): ApiError => ({
   code: e.code,
   message: 'Invalid input'
 });
 
 const processInput = (input: string): Result<number, ApiError> =>
-  chain(checkRange)(mapError(toApiError)(parse(input)));
+  pipeSync(
+    parse(input),
+    mapError(toApiError),
+    chain(checkRange)
+  );
 
 const result = processInput('21'); // { success: true, data: 21 }
 ```
 
+To compose a synchronous pipeline from an array of operations built at runtime —
+where the exact steps aren't known statically — use `pipeSync.untyped`. It skips
+per-step typing (the result is `Result<any, any>`) but stays synchronous,
+accepting any number of operations, including a spread array:
+
+<!-- example: pipe-sync-untyped -->
+```typescript
+const ops = [
+  map((x: number) => x * 2),
+  map((x: number) => x + 1),
+];
+
+const result = pipeSync.untyped(success(5), ...ops);
+// { success: true, data: 11 }
+```
+
 Each combinator's error type is preserved or widened as it flows through, so
 you get the same type safety as `pipe` without the `Promise` wrapper. Reach for
-`pipe` when a flow mixes async steps; use direct composition when every step is
+`pipe` when a flow mixes async steps; use `pipeSync` when every step is
 synchronous.
 
 ### Array Operations
@@ -593,9 +620,9 @@ const processUser = (user: User): Promise<Result<string, ApiError>> => {
   - Affects: `map`, `mapError`, `tap`, `tapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`
 - Annotate curried callbacks: For `traverse`, `match`, and `fold`, the callback/handler parameters are typed at the first (partial) application, before the data argument is in scope. Annotate them — e.g. `traverse((x: number) => ...)` — or they infer as `unknown`. `sequence(items.map(fn))` is a contextual-typing-friendly equivalent to `traverse`
 - match/fold unions: `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`)
-- Async pipe: The `pipe` function always returns a Promise, even for synchronous operations. For pure sync flows, compose `map`/`chain`/`mapError` directly (see Synchronous Composition)
-- pipe op limit: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked
-- Dynamic composition: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array
+- Async pipe: The `pipe` function always returns a Promise, even for synchronous operations. For pure sync flows, use `pipeSync` (which returns the `Result` directly, with no `Promise` wrapper); the curried combinators also compose directly (see Synchronous Composition)
+- pipe op limit: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked. `pipeSync` mirrors the same 10-op boundary, falling back to `Result<any, any>`
+- Dynamic composition: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array. For sync-only flows, `pipeSync.untyped` is the synchronous equivalent, returning `Result<any, any>`
 - Type inference: Specify error types explicitly when needed: `Result<string, ApiError>`
 - Validation error format: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
 - Array operations: `sequence` stops at first failure; use `partitionResults` if you need all failures. `sequence`, `traverse`, and `partitionResults` accept `readonly` arrays, and `validate` accepts a `readonly` array of validators. A mixed array whose elements carry different success or error types can't be inferred as one `Result<T, E>` — pre-annotate it as `Result<T, E1 | E2>[]` or build it with `items.map(fn)` / `traverse`

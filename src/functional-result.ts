@@ -643,6 +643,261 @@ namespace pipe {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/**
+ * Synchronous twin of `pipe`: composes Result operations left-to-right without
+ * a Promise wrapper. Ops have the shape `(r: Result<T, E>) => Result<U, F>` and
+ * must be synchronous — Promise-returning ops are a compile error, as is a
+ * `Promise<Result>` initial (nothing can be awaited). Provides precise
+ * overloads for up to 10 operations. Chains of 11 or more operations compile
+ * through a fallback overload that types the result as `Result<any, any>`; the
+ * first 10 operations are still type-checked (a mismatch among them is a
+ * compile error), while operations beyond the tenth are unchecked. For fully
+ * dynamic sync composition use `pipeSync.untyped`.
+ * @template T - Initial success type
+ * @template E - Error type of the initial Result; steps may widen it via
+ *  `chain`, and the output error type tracks the final operation
+ * @param initial - Initial Result
+ * @param operations - Operations that transform Results (sync only)
+ * @returns The final Result
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type PipeSyncFallbackOp = (result: Result<any, any>) => Result<any, any>;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+function pipeSync<T, E>(initial: Result<T, E>): Result<T, E>;
+function pipeSync<T, E, T1, E1>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>
+): Result<T1, E1>;
+function pipeSync<T, E, T1, E1, T2, E2>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>
+): Result<T2, E2>;
+function pipeSync<T, E, T1, E1, T2, E2, T3, E3>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>
+): Result<T3, E3>;
+function pipeSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>
+): Result<T4, E4>;
+function pipeSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>
+): Result<T5, E5>;
+function pipeSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>
+): Result<T6, E6>;
+function pipeSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6, T7, E7>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>
+): Result<T7, E7>;
+function pipeSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>
+): Result<T8, E8>;
+function pipeSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>
+): Result<T9, E9>;
+function pipeSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10>
+): Result<T10, E10>;
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Catch-all reachable only with chains of 11+ operations: it repeats
+// overload-10's precise parameters (so the first 10 ops are still checked and
+// a mismatch among them is a compile error), then requires at least one
+// additional, permissively typed operation via the non-empty tuple rest.
+function pipeSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  initial: Result<T, E>,
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10>,
+  ...rest: [PipeSyncFallbackOp, ...PipeSyncFallbackOp[]]
+): Result<any, any>;
+
+function pipeSync<T, E>(
+  initial: Result<T, E>,
+  ...operations: Array<(result: Result<any, any>) => Result<any, any>>
+): Result<any, any> {
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  let current = initial;
+  for (const operation of operations) {
+    current = operation(current);
+  }
+  return current;
+}
+
+/**
+ * Dynamically composes a synchronous pipeline from a runtime-built array of
+ * operations. Unlike `pipeSync`, it performs no step-by-step typing: it accepts
+ * any number of operations (including a spread array) and types the result as
+ * `Result<any, any>`. The initial value is still validated to be a Result. For
+ * statically known sync pipelines prefer `pipeSync`, which keeps precise
+ * inference through 10 operations.
+ * @template T - Initial success type
+ * @template E - Error type of the initial Result
+ * @param initial - Initial Result
+ * @param operations - Operations that transform Results (sync only); not
+ *  type-checked per step
+ * @returns The final Result (typed as `Result<any, any>`)
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// eslint-disable-next-line @typescript-eslint/no-namespace
+namespace pipeSync {
+  export const untyped = <T, E>(
+    initial: Result<T, E>,
+    ...operations: PipeSyncFallbackOp[]
+  ): Result<any, any> => {
+    let current = initial;
+    for (const operation of operations) {
+      current = operation(current);
+    }
+    return current;
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // Export everything
 export type { Result, ValidationError };
 export {
@@ -667,4 +922,5 @@ export {
   getOrThrow,
   unwrapResult,
   pipe,
+  pipeSync,
 };
