@@ -21,12 +21,15 @@ import {
   getOrElse,
   sequence,
   traverse,
+  partitionResults,
+  validate,
   match,
+  fold,
   success,
   failure,
   pipe,
 } from '../src/functional-result';
-import type { Result } from '../src/functional-result';
+import type { Result, ValidationError } from '../src/functional-result';
 import { describe, expect, it } from 'vitest';
 
 type Equal<X, Y> =
@@ -154,6 +157,30 @@ const _sq: Expect<Equal<typeof sq, Result<number[], ParseError>>> = true;
 const tr = traverse((s: string) => success(Number(s)))(roItems);
 const _tr: Expect<Equal<typeof tr, Result<number[], never>>> = true;
 
+// partitionResults and validate now accept readonly arrays too
+const pp = partitionResults(roResults);
+const _pp: Expect<
+  Equal<typeof pp, { successes: number[]; failures: ParseError[] }>
+> = true;
+const roValidators: readonly ((s: string) => null)[] = [() => null];
+const vl = validate(roValidators)('x');
+const _vl: Expect<Equal<typeof vl, Result<string, ValidationError[]>>> = true;
+
+// mixed-error / mixed-type arrays can't be inferred as one Result<T, E>;
+// pin the limitation so a future signature change doesn't go unnoticed
+const rE1: Result<number, E1> = success(1);
+const rE2: Result<number, E2> = success(2);
+// @ts-expect-error sequence can't unify Result<number, E1> and Result<number, E2>
+sequence([rE1, rE2]);
+// @ts-expect-error partitionResults can't unify Result<number, E1> and Result<number, E2>
+partitionResults([rE1, rE2]);
+// the workaround: pre-annotate the array with the union error type
+const annotated: Result<number, E1 | E2>[] = [rE1, rE2];
+const sqAnnotated = sequence(annotated);
+const _sqAnnotated: Expect<
+  Equal<typeof sqAnnotated, Result<number[], E1 | E2>>
+> = true;
+
 /* ---------------------------------------------------------------- */
 /* match: unchanged behavior still checked                            */
 /* ---------------------------------------------------------------- */
@@ -164,6 +191,112 @@ const mt = match(
   (e: E1) => -1
 )(rMatch);
 const _mt: Expect<Equal<typeof mt, number>> = true;
+
+// heterogeneous branch returns infer to a union (fixed by R1 | R2)
+const mtHetero = match(
+  (n: number) => n,
+  (e: E1) => 'bad' as const
+)(rMatch);
+const _mtHetero: Expect<Equal<typeof mtHetero, number | 'bad'>> = true;
+
+// fold inherits the widened return type
+const fdHetero = fold(
+  (n: number) => n,
+  (e: E1) => 'bad' as const
+)(rMatch);
+const _fdHetero: Expect<Equal<typeof fdHetero, number | 'bad'>> = true;
+
+// explicit type arguments use the new 4-generic order <T, E, R1, R2>
+const mtExplicit = match<number, E1, number, string>(
+  (n: number) => n,
+  () => 'x'
+)(rMatch);
+const _mtExplicit: Expect<Equal<typeof mtExplicit, number | string>> = true;
+
+/* ---------------------------------------------------------------- */
+/* pipe: 10-op boundary keeps types; 11+ falls back (catch-all)      */
+/* ---------------------------------------------------------------- */
+
+const pipeMap = map((n: number) => n);
+
+async function pipeBoundary(): Promise<void> {
+  const p10 = await pipe(
+    start,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const _p10: Expect<Equal<typeof p10, Result<number, E1>>> = true;
+
+  const p11 = await pipe(
+    start,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const _p11: Expect<Equal<typeof p11, Result<any, any>>> = true;
+  void _p10;
+  void _p11;
+}
+
+// The catch-all fallback must NOT swallow type errors in short chains:
+// a mismatch in any of the first 10 operations stays a compile error.
+const badShort = pipe(
+  start,
+  // @ts-expect-error map callback is typed for string, but start is Result<number, E1>
+  map((s: string) => s.length)
+);
+void badShort;
+
+// A mismatch at slot 3 of a 13-op chain is also caught (first 10 checked).
+const badLong = pipe(
+  start,
+  pipeMap,
+  pipeMap,
+  // @ts-expect-error op 3 is typed for string, but prior steps yield Result<number, E1>
+  map((s: string) => s.length),
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap,
+  pipeMap
+);
+
+/* ---------------------------------------------------------------- */
+/* pipe.untyped: dynamic composition without step typing             */
+/* ---------------------------------------------------------------- */
+
+// composes a runtime-built op array; result degrades to Result<any, any>
+async function pipeUntypedProbe(): Promise<void> {
+  const untypedOps = [pipeMap, pipeMap, pipeMap];
+  const pu = await pipe.untyped(start, ...untypedOps);
+  const _pu: Expect<Equal<typeof pu, Result<any, any>>> = true;
+  void _pu;
+
+  // rejects a non-Result initial value
+  // @ts-expect-error pipe.untyped requires a Result (or Promise<Result>) initial
+  pipe.untyped(42, pipeMap);
+}
 
 describe('type-level assertions', () => {
   it('compiles the type assertions (the real checks run under tsc)', () => {

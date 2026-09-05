@@ -1,9 +1,24 @@
 ## 0.0.4 (WIP)
 
-- **BREAKING:** explicit type arguments on curried `mapError`, `tapError`, and
+- Breaking: explicit type arguments on curried `mapError`, `tapError`, and
   `getOrElse` must be reordered: `mapError<E, F>(fn)`, `tapError<F>(fn)`,
   `getOrElse<D>(default)`. Code passing explicit type arguments breaks; code
   relying on inference is unaffected
+- Breaking: `match` and `fold` now take four type arguments `<T, E, R1, R2>`
+  instead of three `<T, E, R>` and return `R1 | R2`. Code relying on inference
+  is unaffected; code passing explicit type arguments breaks
+- `match`/`fold` now infer heterogeneous branch returns as a union: e.g.
+  `match(n => n, e => 'bad')(r)` yields `number | 'bad'` instead of a type
+  error (previously both branches had to return the same type)
+- `pipe` now accepts chains longer than 10 operations: a final overload compiles
+  them, falling back to `Promise<Result<any, any>>`. The first 10 operations are
+  still type-checked (a mismatch among them is a compile error); only operations
+  beyond the tenth are unchecked. (11th operation previously errored at compile.)
+- Added `pipe.untyped(initial, ...operations)` for composing a pipeline from a
+  runtime-built array of operations (e.g. `pipe.untyped(start, ...ops)`). It
+  performs no step-by-step typing, returning `Promise<Result<any, any>>`, while
+  still validating that the initial value is a Result. For statically known
+  pipelines prefer `pipe`
 - Fixed `tryCatch` type inference: promise-returning thunks now bind `T` to the
   awaited value instead of `Promise<T>` (type-level fix, runtime unchanged)
 - Fixed curried generics for `chain`, `map`, and `tap`: the error type is no
@@ -20,7 +35,8 @@
   `E`, even with an unannotated handler)
 - `getOrElse` now returns `T | D`, so a default value need not match the
   success type exactly (e.g. `getOrElse(null)` works on `Result<string | null, E>`)
-- `sequence` and `traverse` now accept `readonly` arrays
+- `sequence`, `traverse`, and `partitionResults` now accept `readonly` arrays;
+  `validate` accepts a `readonly` array of validators
 
 ## 0.0.3
 

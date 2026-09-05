@@ -12,7 +12,7 @@ const processInput = await pipe(
 );
 // Result: { success: true, data: 10 }
 
-// If any operation fails, subsequent operations are skipped
+// If any operation fails, subsequent operations no-op in effect
 const processInvalid = await pipe(
   success('abc'),
   map(s => s.trim()),

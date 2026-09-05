@@ -11,6 +11,8 @@ a human.
 # Build agent guidelines
 
 - For anything more complex than a quick change, use a todo list to track your work.
+- Important: use a todo.md file if you do not have access to a todoread tool;
+  todowrite is useless without todoread
 - When refactoring, verify that it works with one case before copying throughout.
 - Prefer a TDD approach:
   1. Write a test that fails or update an existing test so that it fails.

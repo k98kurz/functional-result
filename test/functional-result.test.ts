@@ -575,6 +575,39 @@ describe('Composition', () => {
     expect(result.success).toBe(true);
     expect(unwrapResult(result)).toBe(84);
   });
+
+  it('[P14] pipe.untyped composes a runtime-built operation array', async () => {
+    const ops = [map((x: number) => x * 2), map((x: number) => x + 1)];
+    const result = await pipe.untyped(success<number, string>(5), ...ops);
+    expect(result.success).toBe(true);
+    expect(unwrapResult(result)).toBe(11);
+  });
+
+  it('[P15] pipe.untyped propagates failures', async () => {
+    const ops = [
+      chain((_x: number) => failure<number, string>('boom')),
+      map((x: number) => x * 2),
+    ];
+    const result = await pipe.untyped(success<number, string>(5), ...ops);
+    expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
+    expect(result.error).toBe('boom');
+  });
+
+  it('[P16] pipe.untyped handles empty ops and mixed sync/async', async () => {
+    const initial = success<number, string>(5);
+    const empty = await pipe.untyped(initial);
+    expect(empty === initial).toBe(true);
+
+    const mixed = await pipe.untyped(
+      initial,
+      map((x: number) => x * 2),
+      async (r: Result<number, string>) =>
+        chain((x: number) => success(x + 1))(r)
+    );
+    expect(mixed.success).toBe(true);
+    expect(unwrapResult(mixed)).toBe(11);
+  });
 });
 
 describe('Collections', () => {

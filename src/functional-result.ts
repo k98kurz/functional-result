@@ -136,15 +136,16 @@ const chain =
  * Curried function: first takes success/failure handlers, then the Result.
  * @template T - Success type
  * @template E - Error type
- * @template R - Return type
+ * @template R1 - Success-branch return type
+ * @template R2 - Failure-branch return type
  * @param onSuccess - Function to execute on success
  * @param onFailure - Function to execute on failure
  * @returns Function that takes a Result and returns the result of pattern
  *  matching
  */
 const match =
-  <T, E, R>(onSuccess: (data: T) => R, onFailure: (error: E) => R) =>
-  (result: Result<T, E>): R =>
+  <T, E, R1, R2>(onSuccess: (data: T) => R1, onFailure: (error: E) => R2) =>
+  (result: Result<T, E>): R1 | R2 =>
     result.success ? onSuccess(result.data) : onFailure(result.error);
 
 /**
@@ -153,7 +154,8 @@ const match =
  * Alias for match with more semantic meaning for final value extraction.
  * @template T - Success type
  * @template E - Error type
- * @template R - Return type
+ * @template R1 - Success-branch return type
+ * @template R2 - Failure-branch return type
  * @param onSuccess - Function to execute on success
  * @param onFailure - Function to execute on failure
  * @returns Function that takes a Result and returns the folded value
@@ -198,12 +200,12 @@ const traverse =
  * failures separately.
  * @template T - Success type of individual Results
  * @template E - Error type
- * @param results - Array of Results to partition
+ * @param results - Readonly array of Results to partition
  * @returns {{ successes: T[], failures: E[] }} Object with `successes`
  *  array and `failures` array of error values
  */
 const partitionResults = <T, E>(
-  results: Result<T, E>[]
+  results: readonly Result<T, E>[]
 ): {
   successes: T[];
   failures: E[];
@@ -230,7 +232,7 @@ const partitionResults = <T, E>(
  *  T or an array of ValidationError on failure
  */
 const validate =
-  <T>(validators: ((t: T) => ValidationError | null)[]) =>
+  <T>(validators: readonly ((t: T) => ValidationError | null)[]) =>
   (value: T): Result<T, ValidationError[]> => {
     const errors = validators
       .map(v => v(value))
@@ -384,10 +386,12 @@ const getOrThrow = unwrapResult;
 
 /**
  * Unified pipe function for composing Result operations. Handles both
- * synchronous and asynchronous operations through Promise resolution. Provides
- * overloads for up to 10 operations for proper type inference through the
- * chain.
- * Falls back gracefully for longer chains (`Promise<Result<any, any>>`).
+ * synchronous and asynchronous operations through Promise resolution.
+ * Provides precise overloads for up to 10 operations. Chains of 11 or more
+ * operations compile through a fallback overload that types the result as
+ * `Promise<Result<any, any>>`; the first 10 operations are still type-checked
+ * (a mismatch among them is a compile error), while operations beyond the
+ * tenth are unchecked. For fully dynamic composition use `pipe.untyped`.
  * @template T - Initial success type
  * @template E - Error type of the initial Result; steps may widen it via
  *  `chain`, and the output error type tracks the final operation
@@ -395,6 +399,11 @@ const getOrThrow = unwrapResult;
  * @param operations - Operations that transform Results
  * @returns Promise resolving to the final Result
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type PipeFallbackOp = (
+  result: Result<any, any>
+) => Result<any, any> | Promise<Result<any, any>>;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 function pipe<T, E>(
   initial: Result<T, E> | Promise<Result<T, E>>
 ): Promise<Result<T, E>>;
@@ -548,6 +557,48 @@ function pipe<
 ): Promise<Result<T10, E10>>;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Catch-all reachable only with chains of 11+ operations: it repeats
+// overload-10's precise parameters (so the first 10 ops are still checked and
+// a mismatch among them is a compile error), then requires at least one
+// additional, permissively typed operation via the non-empty tuple rest.
+function pipe<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  initial: Result<T, E> | Promise<Result<T, E>>,
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8> | Promise<Result<T8, E8>>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9> | Promise<Result<T9, E9>>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10> | Promise<Result<T10, E10>>,
+  ...rest: [PipeFallbackOp, ...PipeFallbackOp[]]
+): Promise<Result<any, any>>;
+
 async function pipe<T, E>(
   initial: Result<T, E> | Promise<Result<T, E>>,
   ...operations: Array<
@@ -561,6 +612,36 @@ async function pipe<T, E>(
   }
   return current;
 }
+
+/**
+ * Dynamically composes a pipeline from a runtime-built array of operations.
+ * Unlike `pipe`, it performs no step-by-step typing: it accepts any number of
+ * operations (including a spread array) and types the result as
+ * `Promise<Result<any, any>>`. The initial value is still validated to be a
+ * Result (or a Promise of one). For statically known pipelines prefer `pipe`,
+ * which keeps precise inference through 10 operations.
+ * @template T - Initial success type
+ * @template E - Error type of the initial Result
+ * @param initial - Initial Result or Promise<Result>
+ * @param operations - Operations that transform Results; not type-checked per
+ *  step
+ * @returns Promise resolving to the final Result (typed as `Result<any, any>`)
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// eslint-disable-next-line @typescript-eslint/no-namespace
+namespace pipe {
+  export const untyped = async <T, E>(
+    initial: Result<T, E> | Promise<Result<T, E>>,
+    ...operations: PipeFallbackOp[]
+  ): Promise<Result<any, any>> => {
+    let current = await Promise.resolve(initial);
+    for (const operation of operations) {
+      current = await Promise.resolve(operation(current));
+    }
+    return current;
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // Export everything
 export type { Result, ValidationError };

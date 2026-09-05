@@ -12,7 +12,7 @@ compatibility: >
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
   version: "0.0.4"
-  last-updated: "2026-09-03"
+  last-updated: "2026-09-05"
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
@@ -109,7 +109,7 @@ const processInput = await pipe(
 );
 // Result: { success: true, data: 10 }
 
-// If any operation fails, subsequent operations are skipped
+// If any operation fails, subsequent operations no-op in effect
 const processInvalid = await pipe(
   success('abc'),
   map(s => s.trim()),
@@ -516,13 +516,15 @@ if (isFailure(result)) {
 
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
-- **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead
+- **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead. `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`)
 - **Sync composition**: `pipe` is async-only; for pure sync flows, compose `map`/`chain`/`mapError` directly without the `Promise` wrapper
 - **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
+- **pipe op limit**: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked
+- **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array
 - **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
 - **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
-- **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures. `sequence` and `traverse` accept `readonly` arrays; `partitionResults` takes a mutable array
+- **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures. `sequence`, `traverse`, and `partitionResults` accept `readonly` arrays, and `validate` accepts a `readonly` array of validators. A mixed array whose elements carry different success or error types can't be inferred as one `Result<T, E>` — pre-annotate it as `Result<T, E1 | E2>[]` or build it with `items.map(fn)` / `traverse`
 - **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values). A `mapError`/`tapError` handler must cover the full union of errors it may encounter
 - **getOrElse defaults**: `getOrElse(defaultValue)` returns `T | D`, so the default need not match the success type exactly (e.g. `getOrElse(null)` on `Result<string | null, E>`)
 - **Error widening**: `chain` unions its step's errors with the input's (`Result<T, E>` + step returning `Result<U, F>` → `Result<U, E | F>`); `map` and `tap` preserve the input error type

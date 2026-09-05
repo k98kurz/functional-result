@@ -75,7 +75,11 @@ inner:
   while keeping a narrow-handler-on-wider-union a type error)
 - `getOrElse` → `<D>(d) => <T, E>(result): T | D` (default need not equal `T`)
 - `success` defaults `E = never` so a bare `success(x)` doesn't widen the
-  union; `sequence`/`traverse` accept `readonly` arrays
+  union; `sequence`/`traverse`/`partitionResults` accept `readonly` arrays and
+  `validate` accepts a `readonly` validator array
+- `match`/`fold` → `<T, E, R1, R2>(onSuccess, onFailure) => (r): R1 | R2` so
+  heterogeneous branch returns infer as a union instead of erroring (see the
+  inference-limitation entry below)
 
 **Lesson:** the runtime test suite cannot detect type degradation — a
 collapsed `Result<unknown, unknown>` still compiles and runs. Type-level
@@ -188,3 +192,57 @@ overflow doesn't trigger rewrapping.
 
 Run `npm run check:jsdoc` (or `npm run lint`, which includes it) to verify
 compliance. The script is in `scripts/check-jsdoc-lines.mjs`.
+
+## TypeScript inference won't union across separate positions
+
+**Gotcha (2026-09-04):** TypeScript infers a generic `R` from the first
+candidate and checks the rest against it, and it cannot decompose a
+union-typed array against a generic union target like `Result<T, E>`. Two
+symptoms in this library: (1) `match`/`fold` with a single return generic `R`
+couldn't union heterogeneous branch returns (`match(n => n, e => 'bad')`
+errored), and (2) `sequence`/`partitionResults` reject arrays whose elements
+carry different success or error types (e.g. `Result<number, E1>` + `Result
+<number, E2>`), because `T`/`E` fix from the first element and the rest are
+checked against it.
+
+**Solution:** for a combinator with multiple independent callbacks whose
+returns should union, use separate generics — `match<T, E, R1, R2>(...) =>
+R1 | R2` — so each branch infers independently (`fold` inherits via alias).
+For array combinators over a generic union type, TS cannot unify element
+unions, so do NOT fight the signature: document the workaround (pre-annotate
+the array as `Result<T, E1 | E2>[]`, or build it via `items.map(fn)` /
+`traverse`). Pin both behaviors with type-level `Equal`/`Expect` assertions
+and `@ts-expect-error` guards in `test/`.
+
+## pipe overload ordering: typed-first, catch-all-last
+
+**Decision (2026-09-04, revised):** Fixed-arity typed overloads FIRST (0..10
+ops), catch-all LAST. A plain rest-args catch-all handles >10 chains but
+swallows type errors in ≤10-op chains: when a bad op makes the typed overloads
+fail, first-match-wins resolution falls through to the catch-all — the call
+compiles and the result degrades to `Result<any, any>`. Call-site annotations
+can't fix it.
+
+**Hardened pattern:** repeat overload-10's typed parameters in the catch-all
+and require at least one extra op via a non-empty tuple rest — `op1..op10`
+(typed) + `...rest: [PipeFallbackOp, ...PipeFallbackOp[]]`. A bad op among
+the first ten now fails every overload (TS2345); correct 11+ chains still
+match. Ops beyond the tenth go unchecked.
+
+**`pipe.untyped`:** sanctioned path for fully dynamic composition (spreading
+a runtime-built op array, which the hardened overloads reject). Attached via
+function/namespace declaration merging; initial value typed precisely, ops
+and result permissive. Needs a local `// eslint-disable` (`no-namespace`,
+`no-redeclare`).
+
+**Lessons:**
+- Only declared overloads are visible to callers — a rest-args implementation
+  signature alone is not externally callable.
+- A `type`/`interface` declaration between overloads splits the overload group
+  (TS2391). Place helper aliases before the first overload; comments between
+  overloads are fine.
+- `@ts-expect-error` must sit immediately before the offending argument line
+  in a multi-line call, not before the statement that consumes the call.
+- `/* eslint-disable */` comments before an elided overload are dropped from
+  emitted JS (harmless) — verify runtime parity by diffing comment-stripped
+  JS rather than chasing byte-identical emit.
