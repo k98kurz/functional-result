@@ -1,4 +1,4 @@
-## 0.0.4 (WIP)
+## 0.0.4
 
 - Breaking: explicit type arguments on curried `mapError`, `tapError`, and
   `getOrElse` must be reordered: `mapError<E, F>(fn)`, `tapError<F>(fn)`,

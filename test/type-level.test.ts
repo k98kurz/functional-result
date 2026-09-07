@@ -27,6 +27,7 @@ import {
   fold,
   success,
   failure,
+  tryCatch,
   pipe,
   pipeSync,
   flow,
@@ -215,6 +216,30 @@ const mtExplicit = match<number, E1, number, string>(
   () => 'x'
 )(rMatch);
 const _mtExplicit: Expect<Equal<typeof mtExplicit, number | string>> = true;
+
+/* ---------------------------------------------------------------- */
+/* tryCatch: promise thunks bind T to the awaited value              */
+/* ---------------------------------------------------------------- */
+
+async function tryCatchProbe(): Promise<void> {
+  // async thunk: T binds to the awaited value, not Promise<string>
+  const r = await tryCatch(async () => 'x');
+  const _r: Expect<Equal<typeof r, Result<string, unknown>>> = true;
+
+  // sync thunk: unchanged
+  const s = await tryCatch(() => 42);
+  const _s: Expect<Equal<typeof s, Result<number, unknown>>> = true;
+
+  // transformer narrows the error channel
+  const t = await tryCatch(
+    async () => 'x',
+    (e: unknown) => `err: ${String(e)}`
+  );
+  const _t: Expect<Equal<typeof t, Result<string, string>>> = true;
+  void _r;
+  void _s;
+  void _t;
+}
 
 /* ---------------------------------------------------------------- */
 /* pipe: 10-op boundary keeps types; 11+ falls back (catch-all)      */

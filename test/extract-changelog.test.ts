@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractTopEntries,
+  getHeadingSuffix,
   getTopVersion,
   matchesVersion,
 } from '../scripts/extract-changelog.mjs';
@@ -58,6 +59,20 @@ describe('extract-changelog', () => {
 
     it('is false when they differ', () => {
       expect(matchesVersion(sample, '9.9.9')).toBe(false);
+    });
+  });
+
+  describe('getHeadingSuffix', () => {
+    it('returns empty string for a plain version heading', () => {
+      expect(getHeadingSuffix('## 1.2.3\n\n- x\n')).toBe('');
+    });
+
+    it('returns the WIP marker for an unfinalized heading', () => {
+      expect(getHeadingSuffix(sample)).toBe('(WIP)');
+    });
+
+    it('returns empty string when there is no version heading', () => {
+      expect(getHeadingSuffix('no headings here')).toBe('');
     });
   });
 });

@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, '..');
 
-const HEADING_RE = /^## (\d+\.\d+\.\d+)/;
+const HEADING_RE = /^## (\d+\.\d+\.\d+)([^\n]*)/;
 
 export function extractTopEntries(text, count) {
   const lines = text.split('\n');
@@ -33,6 +33,11 @@ export function getTopVersion(text) {
   return match ? match[1] : null;
 }
 
+export function getHeadingSuffix(text) {
+  const match = text.match(HEADING_RE);
+  return match ? match[2].trim() : '';
+}
+
 export function matchesVersion(text, pkgVersion) {
   return getTopVersion(text) === pkgVersion;
 }
@@ -55,6 +60,16 @@ function main(argv) {
   const pkg = readJson(packagePath);
   const pkgVersion = pkg.version;
   const text = fs.readFileSync(changelogPath, 'utf8');
+
+  const suffix = getHeadingSuffix(text);
+  if (suffix) {
+    console.error(
+      `extract-changelog: top changelog heading has trailing text "${suffix}" ` +
+        `but must be exactly "## <version>" — finalize the release heading ` +
+        `(remove the "${suffix}") before building.`
+    );
+    process.exit(1);
+  }
 
   if (!matchesVersion(text, pkgVersion)) {
     console.error(
