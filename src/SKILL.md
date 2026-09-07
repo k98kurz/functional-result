@@ -4,16 +4,16 @@ description: >
   Functional error handling with the Result type. Use when you need to chain
   operations that may fail, collect validation errors, convert exception-based
   code to explicit error handling, or work with typed success/failure paths in
-  TypeScript. Provides map, chain, pipe, pipeSync, flow, tryCatch, tryCatchSync,
-  validate, sequence, traverse, tap, tapError, and match/fold for composable
-  error handling.
+  TypeScript. Provides map, mapError, chain, pipe, pipeSync, flow, flowSync,
+  tryCatch, tryCatchSync, validate, sequence, traverse, tap, tapError, and
+  match/fold for composable error handling.
 license: ISC
 compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
   version: "0.0.4"
-  last-updated: "2026-09-05"
+  last-updated: "2026-09-07"
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
@@ -37,20 +37,8 @@ Use `@k98kurz/functional-result` when:
 
 ## Core patterns
 
-### Creating Results
-
-<!-- example: creating-results -->
-```typescript
-import { success, failure } from '@k98kurz/functional-result';
-
-// Create a successful result
-const successful = success(42);
-// { success: true, data: 42 }
-
-// Create a failed result
-const failed = failure('Something went wrong');
-// { success: false, error: 'Something went wrong' }
-```
+Construct results with `success(data)` → `{ success: true, data }` and
+`failure(error)` → `{ success: false, error }`.
 
 ### Transforming with map (success-only)
 
@@ -121,163 +109,34 @@ const processInvalid = await pipe(
 // Result: { success: false, error: 'Invalid number' }
 ```
 
-`pipe` always returns a `Promise`. For pure synchronous flows, use `pipeSync`,
-its synchronous twin — the same flat, left-to-right shape as `pipe` but it
-returns the final `Result` directly, with no `Promise` wrapper:
+`pipe` always returns a `Promise`, even for all-sync operations. For pure
+synchronous flows, use `pipeSync` — the same flat, left-to-right shape, but it
+returns the final `Result` directly with no `Promise` wrapper. The curried
+combinators (`map`, `chain`, ...) also compose directly, without `pipe` at all.
 
-<!-- example: pipe-sync-composition -->
-```typescript
-import {
-  chain,
-  failure,
-  mapError,
-  pipeSync,
-  success,
-} from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
-
-type ParseError = { code: string };
-type ApiError = { code: string; message: string };
-
-const parse = (input: string): Result<number, ParseError> => {
-  const n = Number(input);
-  return isNaN(n) ? failure({ code: 'parse' }) : success(n);
-};
-
-const checkRange = (n: number): Result<number, ApiError> =>
-  n > 100 ? failure({ code: 'range', message: `${n} is out of range` }) : success(n);
-
-const toApiError = (e: ParseError): ApiError => ({
-  code: e.code,
-  message: 'Invalid input'
-});
-
-const processInput = (input: string): Result<number, ApiError> =>
-  pipeSync(
-    parse(input),
-    mapError(toApiError),
-    chain(checkRange)
-  );
-
-const result = processInput('21'); // { success: true, data: 21 }
-```
-
-The curried combinators compose directly as the underlying primitive, but
-`pipeSync` keeps the same flat, left-to-right DX as `pipe` without forcing
-`async`/`await` into an all-sync chain.
-
-### Composing reusable pipelines with flow / flowSync
+### Reusable pipelines with flow / flowSync
 
 `pipe` and `pipeSync` are data-first: the initial value seeds type inference at
 the call site. To define a pipeline once and apply it to data that arrives
 later, use `flow` (async or mixed steps, returns a `Promise`) or `flowSync`
-(sync steps only, returns the `Result` directly). Their input error type stays
-generic until the returned function is applied:
-
-<!-- example: flow-composition -->
-```typescript
-import {
-  chain,
-  failure,
-  flow,
-  map,
-  success,
-} from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
-
-type User = { id: number; email: string };
-type ApiError = { code: string; message: string };
-
-const sendEmail = (email: string): Result<boolean, ApiError> =>
-  email.includes('@')
-    ? success(true)
-    : failure({ code: 'email', message: 'invalid email' });
-
-const processUser = flow(
-  map((u: User) => u.email),
-  chain(sendEmail),
-  async <E>(r: Result<boolean, E>) =>
-    r.success ? success('sent') : r
-);
-
-const userA = success({ id: 1, email: 'a@example.com' } as User);
-const userB = success({ id: 2, email: 'no-at.example.com' } as User);
-
-const a = await processUser(userA); // { success: true, data: 'sent' }
-const b = await processUser(userB);
-// { success: false, error: { code: 'email', message: 'invalid email' } }
-```
-
-Since no data is in scope at definition time, annotate callbacks there and keep
-a hand-written op's input error annotation permissive (`unknown` or generic);
-prefer a generic `<E>` on ops that pass failures through unchanged, since
-`unknown` widens that op's output error channel to `unknown`. An op that
-narrows the incoming error belongs per-application. For an all-sync pipeline
-that should not introduce a `Promise`, use `flowSync`:
-
-<!-- example: flow-sync-composition -->
-```typescript
-import {
-  chain,
-  failure,
-  flowSync,
-  map,
-  success,
-} from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
-
-type Input = { value: number };
-type ApiError = { code: string; message: string };
-
-const checkRange = (n: number): Result<number, ApiError> =>
-  n > 100
-    ? failure({ code: 'range', message: `${n} is out of range` })
-    : success(n);
-
-const processInput = flowSync(
-  map((i: Input) => i.value),
-  chain(checkRange)
-);
-
-const resultA = processInput(success({ value: 42 } as Input));
-const resultB = processInput(success({ value: 200 } as Input));
-```
+(sync steps only, returns the `Result` directly). No data is in scope at
+definition time, so annotate callbacks there and follow the flow-annotation
+rules in Gotchas below (`<E>` generics on pass-through ops, per-application
+narrowing).
 
 ### Side effects with tap and tapError
 
-Both are curried and return the original Result unchanged, making them safe in pipelines:
-
-<!-- example: tap-tap-error -->
-```typescript
-import {
-  tap, tapError, pipe, map, success, failure
-} from '@k98kurz/functional-result';
-
-const logSuccess = tap((data: string) => console.log('Success:', data));
-const logFailure = tapError((err: string) => console.error(err));
-
-const result = await pipe(
-  success('  hello  '),
-  logSuccess,   // logs "Success:   hello  " — result passes through
-  logFailure,   // does nothing
-  map(s => s.trim().toUpperCase()),
-  logSuccess    // logs "Success: HELLO"
-);
-
-// Failures skip success taps and run error taps
-const failed = await pipe(
-  failure('db timeout'),
-  logSuccess,   // does nothing
-  logFailure    // logs "db timeout"
-);
-```
+Both are curried and return the original Result unchanged, making them safe in
+pipelines: `tap(fn)` runs on successes, `tapError(fn)` on failures — failures
+skip success taps and vice versa.
 
 ## Migration from exception-based code
 
 ### Pattern 1: Wrap existing code with tryCatch
 
-Use `tryCatch` for operations that may be async or sync. For synchronous-only
-operations where you want to avoid Promise overhead, use `tryCatchSync`:
+Use `tryCatch` for operations that may be async or sync; for synchronous-only
+operations where you want to avoid Promise overhead, use `tryCatchSync` (same
+signature, no `Promise`):
 
 <!-- example: try-catch -->
 ```typescript
@@ -304,30 +163,6 @@ const asyncResult = await tryCatch(async () => {
 
 // Transform errors for better context
 const result = await tryCatch(
-  () => sometimesThrows(),
-  (error) =>
-    `Operation failed: ${error instanceof Error ? error.message : String(error)}`
-);
-```
-
-<!-- example: try-catch-sync -->
-```typescript
-import { tryCatchSync } from '@k98kurz/functional-result';
-
-const sometimesThrows = (): unknown => {
-  const input = Math.random() < 0.5 ? '{"valid": true}' : 'not json';
-  return JSON.parse(input);
-};
-
-// Wrap synchronous operations (no await needed)
-const syncResult = tryCatchSync(() => {
-  const data = JSON.parse('{"valid": true}');
-  return data.valid;
-});
-// { success: true, data: true }
-
-// Transform errors for better context
-const result = tryCatchSync(
   () => sometimesThrows(),
   (error) =>
     `Operation failed: ${error instanceof Error ? error.message : String(error)}`
@@ -430,37 +265,6 @@ const result = traverse((x: string) => {
 // { success: true, data: [2, 4, 6] }
 ```
 
-Annotate the callback parameter (`(x: string)`): `traverse` is curried, so the
-callback is typed at partial application before `items` is in scope, and an
-unannotated parameter infers as `unknown`. `sequence(items.map(fn))` is an
-equivalent that types the callback from the array instead.
-
-### PartitionResults: Collect all successes and failures
-
-<!-- example: partition-results -->
-```typescript
-import { partitionResults } from '@k98kurz/functional-result';
-
-const results = [
-  success(1),
-  failure('error1'),
-  success(2),
-  failure('error2')
-];
-
-const { successes, failures } = partitionResults(results);
-// successes: [1, 2]
-// failures: ['error1', 'error2']
-
-// Use case: partial failure processing
-if (successes.length > 0) {
-  console.log(`Processed ${successes.length} items`);
-}
-if (failures.length > 0) {
-  console.log(`${failures.length} items failed`);
-}
-```
-
 ## Validation with multiple errors
 
 Use `validate` when you need to collect all validation errors:
@@ -512,28 +316,11 @@ const finalValue = fold(
 // '42'
 ```
 
-Annotate the handler parameters: `match`/`fold` handlers are typed at
-application time, so unannotated parameters infer as `unknown`.
-
 ### Default values with getOrElse
 
-<!-- example: get-or-else -->
-```typescript
-import { getOrElse } from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
-
-const successResult = success(42);
-const value = getOrElse(0)(successResult);
-// 42
-
-const failureResult = failure('error');
-const fallback = getOrElse(0)(failureResult);
-// 0
-
-// defaults need not match the success type exactly (returns T | D):
-const maybeNullableResult: Result<string | null, Error> = success('x');
-const maybeNull = getOrElse(null)(maybeNullableResult); // string | null
-```
+`getOrElse(default)(result)` returns the data on success or the provided
+default on failure; the default's type may differ from the success type (see
+Gotchas).
 
 ### Exiting the Result paradigm with unwrapResult
 
@@ -558,67 +345,28 @@ app.get('/users/:id', async (req, res) => {
 });
 ```
 
-Note: When using `unwrapResult`, consider converting custom error types to proper
-`Error` instances first to preserve stack traces:
-
-<!-- example: map-error-stack-trace -->
-```typescript
-import { mapError, unwrapResult, success } from '@k98kurz/functional-result';
-import type { Result } from '@k98kurz/functional-result';
-
-type CustomError = { message: string; stack?: string };
-const someFunctionReturnsResult = (): Result<string, CustomError> =>
-  success('x');
-
-const result = someFunctionReturnsResult();
-const ensureError = mapError((err: CustomError) => {
-  const error = new Error(err.message);
-  if (err.stack) error.stack = err.stack;
-  return error;
-});
-const data = unwrapResult(ensureError(result));
-```
+When unwrapping results that carry custom error types, convert them to real
+`Error` instances with `mapError` first to preserve stack traces.
 
 ## Type guards
 
-Use type guards to narrow Result types in conditionals:
-
-<!-- example: type-guards -->
-```typescript
-import { isSuccess, isFailure } from '@k98kurz/functional-result';
-
-const result: Result<string, number> = success('test');
-
-if (isSuccess(result)) {
-  // TypeScript knows result.data is a string here
-  console.log(result.data.toUpperCase());
-} else {
-  // TypeScript knows result.error is a number here
-  console.log(`Error code: ${result.error}`);
-}
-
-// isFailure is the inverse
-if (isFailure(result)) {
-  console.log(`Error: ${result.error}`);
-}
-```
+`isSuccess(result)` and `isFailure(result)` narrow the type in conditionals —
+inside the branch, `result.data` or `result.error` is accessible without casts.
 
 ## Gotchas
 
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
 - **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead. `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`). The same applies to `flow`/`flowSync`: annotate callbacks at definition time, since no data is in scope there either
-- **Sync composition**: `pipe` is async-only; for pure sync flows use `pipeSync` (returns the `Result` directly, no `Promise` wrapper). The curried combinators also compose directly without the `Promise` wrapper
-- **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
+- **Async pipe**: `pipe` always returns a Promise, even for synchronous operations. For pure sync flows use `pipeSync` (returns the `Result` directly, no `Promise` wrapper); the curried combinators also compose directly without the `Promise` wrapper
 - **pipe op limit**: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked. `pipeSync` mirrors the same 10-op boundary, falling back to `Result<any, any>`
 - **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array, as do `flow` and `flowSync`. For sync-only flows, `pipeSync.untyped` is the synchronous equivalent, returning `Result<any, any>`
 - **Reusable pipelines**: to define a pipeline once and apply it later, use `flow(...ops)` (mixed or async steps, returns a `Promise`) or `flowSync(...ops)` (sync only, returns the `Result` directly). Their input error type stays generic until application; both mirror the 10-op typed cutoff of `pipe`/`pipeSync`
 - **flow op annotations**: ops in a reusable flow need permissive input-error annotations — `unknown` on a pass-through op silently widens its output error channel to `unknown`, so prefer a generic `<E>`; a `mapError((e: SomeLiteral) => ...)` narrows `E` and belongs per-application; partial explicit type args are unsupported (`flow<User, E>(...)` is a compile error) — annotate the first op's callback instead
 - **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
-- **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`
 - **Array operations**: `sequence` stops at first failure; use `partitionResults` if you need all failures. `sequence`, `traverse`, and `partitionResults` accept `readonly` arrays, and `validate` accepts a `readonly` array of validators. A mixed array whose elements carry different success or error types can't be inferred as one `Result<T, E>` — pre-annotate it as `Result<T, E1 | E2>[]` or build it with `items.map(fn)` / `traverse`
-- **mapError exists**: Use `mapError` to transform error values, not `map` (which only transforms success values). A `mapError`/`tapError` handler must cover the full union of errors it may encounter
+- **map vs chain**: use `chain` when the operation returns a Result — `map` would nest (`Result<Result<number, E>, E>`). Use `mapError` to transform error values, not `map` (which only transforms success values); a `mapError`/`tapError` handler must cover the full union of errors it may encounter
 - **getOrElse defaults**: `getOrElse(defaultValue)` returns `T | D`, so the default need not match the success type exactly (e.g. `getOrElse(null)` on `Result<string | null, E>`)
 - **Error widening**: `chain` unions its step's errors with the input's (`Result<T, E>` + step returning `Result<U, F>` → `Result<U, E | F>`); `map` and `tap` preserve the input error type
 - **Error propagation**: `pipe` invokes every operation even after a failure — `map`/`chain`/`tap` no-op on a failed Result (while `mapError`/`tapError` still run), which makes steps *appear* skipped
@@ -666,7 +414,7 @@ const validateAndProcessUser = (input: unknown) => {
 };
 ```
 
-### Partial batch processing
+### Partial batch processing (partitionResults)
 
 <!-- example: skill-batch-processing -->
 ```typescript
@@ -689,31 +437,9 @@ const processBatch = (items: string[]) => {
 };
 ```
 
-## Anti-patterns to avoid
+## Progressive Disclosure
 
-<!-- example: anti-patterns -->
-```typescript
-// DON'T: Use map for operations that return Results
-const bad = map(x => success(x * 2))(result); // Returns Result<Result<number, E>, E>
+This skill includes reference files. Load these when needed:
 
-// DO: Use chain for operations that return Results
-const good = chain(x => success(x * 2))(result); // Returns Result<number, E>
-
-// DON'T: Forget that pipe is async
-const bad = pipe(success(1), map(x => x * 2)); // Returns Promise, not Result
-const value = bad.data; // Error: value is Promise, not Result
-
-// DO: Await the pipe result
-const good = await pipe(success(1), map(x => x * 2));
-const value = good.data; // Correct
-
-// DON'T: Use unwrapResult without try-catch
-const bad = unwrapResult(mayFail()); // Could throw
-
-// DO: Handle errors appropriately
-try {
-  const good = unwrapResult(mayFail());
-} catch (error) {
-  handleError(error);
-}
-```
+- **Load `references/composition.md` when** defining a reusable `flow`/`flowSync` pipeline, composing a pure-sync pipeline with `pipeSync`, or when a flow's error type collapses to `unknown`
+- **Load `references/changelog.md` when** checking what changed in the most recent releases or reviewing breaking changes before upgrading

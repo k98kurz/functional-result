@@ -30,7 +30,7 @@ a historical record of churn.
 
 # Changelog
 
-`changelog.md` contains information useful for Component consumers, particularly
+`changelog.md` contains information useful for package consumers, particularly
 for updating versions of the library. This is NOT a graveyard for maintainer code
 churn entries. No internal/maintainer-relevant information should be preserved here.
 The format should be easy to scan and read for consumers of this library.

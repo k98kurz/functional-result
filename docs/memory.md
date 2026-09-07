@@ -3,11 +3,14 @@
 ## Example code is a single source of truth, verified in CI
 
 **Decision (2026-09-03, consolidated same day):** Every TypeScript snippet
-embedded in `readme.md` and `src/SKILL.md` lives verbatim in `examples/<id>.ts`
+embedded in a registered doc lives verbatim in `examples/<id>.ts`
 (the `id` matches a `<!-- example: <id> -->` sentinel placed immediately above
 the doc fence). `scripts/check-examples.mjs` enforces the contract;
 `npm run check:examples` runs `tsc -p tsconfig.examples.json` first, then the
-checker. Both are wired into `prepublishOnly` and `checklist.sh`.
+checker. Both are wired into `prepublishOnly` and `checklist.sh`. The registry
+(`DEFAULT_DOCS`) is fail-open: a doc missing from it is never scanned, so its
+fences silently escape the drift check — register a new doc and update the
+examples' `@docs:` headers together.
 
 **One snippet, many docs:** where readme and SKILL showed near-identical
 snippets, they were merged into ONE file whose `@docs:` header lists both docs;
@@ -35,8 +38,9 @@ doc text stays verbatim. Imports use the package name verbatim;
 `tsconfig.examples.json` maps `@k98kurz/functional-result` to
 `./src/functional-result` so examples compile as-is. Base config's
 `module: ES2022` permits top-level `await`; `noUnusedLocals` is off.
-`examples/illustrative/` holds intentionally non-compiling fragments, marked
-`// @no-compile`, excluded from tsc and eslint but still text-checked.
+`examples/illustrative/` is the sanctioned location for intentionally
+non-compiling fragments (e.g. DON'T/DO pairs); mark them `// @no-compile` —
+they are excluded from tsc and eslint but still text-checked.
 
 **Snippet conventions:** comments show serialized result shapes
 (`// { success: true, data: 10 }`); prefer the richer variant when

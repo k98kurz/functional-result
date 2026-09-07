@@ -1,4 +1,4 @@
-// @docs: readme.md, src/SKILL.md
+// @docs: readme.md
 import { success, failure } from '@k98kurz/functional-result';
 // @snippet-start
 import { partitionResults } from '@k98kurz/functional-result';

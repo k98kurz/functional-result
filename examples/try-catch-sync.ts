@@ -1,4 +1,4 @@
-// @docs: readme.md, src/SKILL.md
+// @docs: readme.md
 // @snippet-start
 import { tryCatchSync } from '@k98kurz/functional-result';
 

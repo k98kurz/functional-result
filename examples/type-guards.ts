@@ -1,4 +1,4 @@
-// @docs: readme.md, src/SKILL.md
+// @docs: readme.md
 import { success } from '@k98kurz/functional-result';
 import type { Result } from '@k98kurz/functional-result';
 // @snippet-start

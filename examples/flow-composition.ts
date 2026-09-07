@@ -1,4 +1,4 @@
-// @docs: readme.md, src/SKILL.md
+// @docs: readme.md, src/references/composition.md
 // @snippet-start
 import {
   chain,

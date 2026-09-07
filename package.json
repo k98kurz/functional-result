@@ -17,6 +17,7 @@
   "files": [
     "dist/bin/functional-result-skill-export.js",
     "dist/SKILL.md",
+    "dist/references",
     "dist/functional-result.*",
     "readme.md"
   ],
@@ -24,7 +25,7 @@
     "build": "npm run build:clean && npm run build:core && npm run build:assets",
     "build:clean": "rm -rf dist",
     "build:core": "tsc -p tsconfig.core.json",
-    "build:assets": "mkdir -p dist/bin && cp src/bin/functional-result-skill-export.js dist/bin/ && chmod +x dist/bin/functional-result-skill-export.js && cp src/SKILL.md dist/",
+    "build:assets": "mkdir -p dist/bin && cp src/bin/functional-result-skill-export.js dist/bin/ && chmod +x dist/bin/functional-result-skill-export.js && cp src/SKILL.md dist/ && mkdir -p dist/references && cp src/references/*.md dist/references/ && node scripts/extract-changelog.mjs",
     "dev": "npm run build:core -- --watch",
     "export:functional-result": "node dist/bin/functional-result-skill-export.js",
     "test": "vitest run",

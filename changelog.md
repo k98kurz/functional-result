@@ -58,6 +58,12 @@
   success type exactly (e.g. `getOrElse(null)` works on `Result<string | null, E>`)
 - `sequence`, `traverse`, and `partitionResults` now accept `readonly` arrays;
   `validate` accepts a `readonly` array of validators
+- Bundled skill now ships a `references/` directory beside `SKILL.md`;
+  `npx export-functional-result-skill` exports the whole directory. The
+  references hold a changelog snippet generated at build time (top two
+  entries) and a composition reference with full examples for the new
+  `pipeSync`/`flow`/`flowSync` APIs; a Progressive Disclosure section in the
+  skill routes to them on demand
 
 ## 0.0.3
 

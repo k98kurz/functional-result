@@ -2,8 +2,9 @@
 /**
  * check-examples.mjs
  *
- * Verifies that every TypeScript code snippet embedded in readme.md and
- * src/SKILL.md is mirrored exactly by a file in examples/.
+ * Verifies that every TypeScript code snippet embedded in the registered docs
+ * (readme.md, src/SKILL.md, src/references/composition.md) is mirrored
+ * exactly by a file in examples/.
  *
  * Contract:
  * - Each ` ```typescript ` fence in a registered doc must be preceded (within
@@ -28,7 +29,11 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_DOCS = ['readme.md', 'src/SKILL.md'];
+const DEFAULT_DOCS = [
+  'readme.md',
+  'src/SKILL.md',
+  'src/references/composition.md',
+];
 const DEFAULT_EXAMPLES_DIR = 'examples';
 const SENTINEL_RE = /^<!--\s*example:\s*([a-z0-9-]+)\s*-->\s*$/;
 

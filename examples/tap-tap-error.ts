@@ -1,4 +1,4 @@
-// @docs: readme.md, src/SKILL.md
+// @docs: readme.md
 // @snippet-start
 import {
   tap, tapError, pipe, map, success, failure
