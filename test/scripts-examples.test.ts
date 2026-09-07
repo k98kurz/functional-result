@@ -7,32 +7,60 @@ import { syncExamples } from '../scripts/sync-examples.mjs';
 
 const TEMP_ROOT = join(process.cwd(), 'temp', 'scripts-tests');
 
-function exampleSrc(regionLines) {
-  return ['// @docs: {{DOC}}', '// @snippet-start', ...regionLines, '// @snippet-end', ''].join('\n');
+interface Fixture {
+  dir: string;
+  docPath: string;
+  examplesDir: string;
 }
 
-function docSrc(id, fenceLines) {
-  return ['', '<!-- example: ' + id + ' -->', '```typescript', ...fenceLines, '```', ''].join('\n');
+function exampleSrc(regionLines: string[]): string {
+  return [
+    '// @docs: {{DOC}}',
+    '// @snippet-start',
+    ...regionLines,
+    '// @snippet-end',
+    '',
+  ].join('\n');
 }
 
-async function writeFixture({ doc = null, examples = {} }) {
+function docSrc(id: string, fenceLines: string[]): string {
+  return [
+    '',
+    '<!-- example: ' + id + ' -->',
+    '```typescript',
+    ...fenceLines,
+    '```',
+    '',
+  ].join('\n');
+}
+
+async function writeFixture({
+  doc = null,
+  examples = {},
+}: {
+  doc?: string | null;
+  examples?: Record<string, string>;
+}): Promise<Fixture> {
   const dir = await mkdtemp(join(TEMP_ROOT, 'fx-'));
   const docPath = join(dir, 'readme.md');
   const examplesDir = join(dir, 'examples');
   await mkdir(examplesDir, { recursive: true });
-  if (doc !== null) await writeFile(docPath, doc);
+  if (doc != null) await writeFile(docPath, doc);
   for (const [name, content] of Object.entries(examples)) {
     await mkdir(dirname(join(examplesDir, name)), { recursive: true });
-    await writeFile(join(examplesDir, name), content.replaceAll('{{DOC}}', docPath));
+    await writeFile(
+      join(examplesDir, name),
+      content.replaceAll('{{DOC}}', docPath)
+    );
   }
   return { dir, docPath, examplesDir };
 }
 
-function analyze(fx) {
+function analyze(fx: Fixture) {
   return analyzeExamples({ docs: [fx.docPath], examplesDir: fx.examplesDir });
 }
 
-function sync(fx) {
+function sync(fx: Fixture) {
   return syncExamples({ docs: [fx.docPath], examplesDir: fx.examplesDir });
 }
 
@@ -53,12 +81,12 @@ describe('examples scripts (check/sync)', () => {
     const before = await readFile(fx.docPath);
     const { findings, mismatches } = analyze(fx);
     expect(mismatches).toHaveLength(1);
-    expect(findings.map((f) => f.code)).toContain('MISMATCH');
+    expect(findings.map(f => f.code)).toContain('MISMATCH');
     const after = await readFile(fx.docPath);
     expect(after.equals(before)).toBe(true);
   });
 
-  it('[C02] syncExamples copies the canonical region over the drifted fence', async () => {
+  it('[C02] syncExamples copies canonical region over drifted fence', async () => {
     const fx = await writeFixture({
       doc: docSrc('foo', ['const x = 2;']),
       examples: { 'foo.ts': exampleSrc(['const x = 1;']) },
@@ -74,7 +102,7 @@ describe('examples scripts (check/sync)', () => {
     expect(re.mismatches).toEqual([]);
   });
 
-  it('[C03] syncExamples repairs multiple fences in one doc without corrupting layout', async () => {
+  it('[C03] sync repairs multiple fences without corrupting layout', async () => {
     const doc = [
       '',
       '<!-- example: foo -->',
@@ -98,7 +126,7 @@ describe('examples scripts (check/sync)', () => {
     });
     const { fixed, findings } = sync(fx);
     expect(findings).toEqual([]);
-    expect(fixed.map((f) => f.id).sort()).toEqual(['bar', 'foo']);
+    expect(fixed.map(f => f.id).sort()).toEqual(['bar', 'foo']);
     const docAfter = await readFile(fx.docPath, 'utf8');
     expect(docAfter).toContain('const foo = 1;');
     expect(docAfter).toContain('const bar = 1;');
@@ -108,7 +136,7 @@ describe('examples scripts (check/sync)', () => {
     expect(re.findings).toEqual([]);
   });
 
-  it('[C04] structural violations are reported and never auto-fixed while drift is repaired', async () => {
+  it('[C04] structural violations reported; only drift repaired', async () => {
     const doc = [
       '',
       '```typescript',
@@ -127,7 +155,7 @@ describe('examples scripts (check/sync)', () => {
     });
     const { fixed, findings } = sync(fx);
     expect(fixed).toEqual([{ doc: fx.docPath, id: 'foo', line: 7 }]);
-    const codes = findings.map((f) => f.code);
+    const codes = findings.map(f => f.code);
     expect(codes).toContain('FENCE_NO_SENTINEL');
     expect(codes).not.toContain('MISMATCH');
     const docAfter = await readFile(fx.docPath, 'utf8');
@@ -135,7 +163,7 @@ describe('examples scripts (check/sync)', () => {
     expect(docAfter).toContain('const rogue = 0;');
   });
 
-  it('[C05] examples with invalid regions are never used as a repair source', async () => {
+  it('[C05] examples with invalid regions never used as repair source', async () => {
     const bad = [
       '// @docs: {{DOC}}',
       '// @snippet-start',
@@ -152,7 +180,7 @@ describe('examples scripts (check/sync)', () => {
     const before = await readFile(fx.docPath);
     const { fixed, findings } = sync(fx);
     expect(fixed).toEqual([]);
-    const codes = findings.map((f) => f.code);
+    const codes = findings.map(f => f.code);
     expect(codes).toContain('MULTI_REGION');
     expect(codes).toContain('MISMATCH');
     const after = await readFile(fx.docPath);
@@ -172,16 +200,22 @@ describe('examples scripts (check/sync)', () => {
   });
 
   it('[C07] unclosed fences are detected', async () => {
-    const doc = ['', '<!-- example: foo -->', '```typescript', 'const x = 1;', ''].join('\n');
+    const doc = [
+      '',
+      '<!-- example: foo -->',
+      '```typescript',
+      'const x = 1;',
+      '',
+    ].join('\n');
     const fx = await writeFixture({
       doc,
       examples: { 'foo.ts': exampleSrc(['const x = 1;']) },
     });
     const { findings } = analyze(fx);
-    expect(findings.map((f) => f.code)).toContain('UNBALANCED_FENCE');
+    expect(findings.map(f => f.code)).toContain('UNBALANCED_FENCE');
   });
 
-  it('[C08] trailing whitespace and CRLF are normalized before comparison', async () => {
+  it('[C08] trailing whitespace and CRLF normalized before comparison', async () => {
     const fxSpaces = await writeFixture({
       doc: docSrc('foo', ['const x = 1;   ']),
       examples: { 'foo.ts': exampleSrc(['const x = 1;']) },
@@ -198,10 +232,12 @@ describe('examples scripts (check/sync)', () => {
     expect(typeof analyzeExamples).toBe('function');
     expect(typeof printFindings).toBe('function');
     expect(typeof syncExamples).toBe('function');
-    const out = execSync(
-      'node --input-type=module -e "await import(\'./scripts/check-examples.mjs\'); await import(\'./scripts/sync-examples.mjs\')"',
-      { encoding: 'utf8' },
-    );
+    const importCmd =
+      "await import('./scripts/check-examples.mjs');" +
+      " await import('./scripts/sync-examples.mjs')";
+    const out = execSync(`node --input-type=module -e "${importCmd}"`, {
+      encoding: 'utf8',
+    });
     expect(out).toBe('');
   });
 
@@ -219,22 +255,22 @@ describe('examples scripts (check/sync)', () => {
       },
     });
     const { findings } = analyze(fx);
-    const marker = findings.filter((f) => f.code === 'ILLUSTRATIVE_MARKER');
-    expect(marker.map((f) => basename(f.file)).sort()).toEqual([
+    const marker = findings.filter(f => f.code === 'ILLUSTRATIVE_MARKER');
+    expect(marker.map(f => basename(f.file)).sort()).toEqual([
       'plain-marked.ts',
       'unmarked.ts',
     ]);
-    expect(findings.filter((f) => f.code !== 'ILLUSTRATIVE_MARKER')).toEqual([]);
+    expect(findings.filter(f => f.code !== 'ILLUSTRATIVE_MARKER')).toEqual([]);
   });
 
-  it('[C11] illustrative detection is path-segment based, not prefix based', async () => {
+  it('[C11] illustrative detection is path-segment based, not prefix', async () => {
     const dir = await mkdtemp(join(TEMP_ROOT, 'seg-'));
     const examplesDir = join(dir, 'examplesillustrative');
     await mkdir(examplesDir, { recursive: true });
     await writeFile(join(dir, 'readme.md'), docSrc('plain', ['const a = 1;']));
     await writeFile(
       join(examplesDir, 'plain.ts'),
-      exampleSrc(['const a = 1;']).replaceAll('{{DOC}}', 'readme.md'),
+      exampleSrc(['const a = 1;']).replaceAll('{{DOC}}', 'readme.md')
     );
     const cwd = process.cwd();
     process.chdir(dir);
@@ -247,5 +283,10 @@ describe('examples scripts (check/sync)', () => {
     } finally {
       process.chdir(cwd);
     }
+  });
+
+  it('[C12] repo examples match registered doc fences', () => {
+    const { findings } = analyzeExamples();
+    expect(findings).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ read-only — no write capability whether run directly or imported (exports
 `scripts/sync-examples.mjs` owns every write: it repairs MISMATCH findings
 only (examples are canonical, direction examples -> docs) and fails on
 structural contract violations. The contract is pinned by
-`test/scripts-examples.test.mjs` (fixtures under gitignored `temp/`). Do not
+`test/scripts-examples.test.ts` (fixtures under gitignored `temp/`). Do not
 add repair logic or a fix flag back into the checker — the read/write split
 is deliberate.
 
