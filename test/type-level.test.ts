@@ -29,6 +29,8 @@ import {
   failure,
   pipe,
   pipeSync,
+  flow,
+  flowSync,
 } from '../src/functional-result';
 import type { Result, ValidationError } from '../src/functional-result';
 import { describe, expect, it } from 'vitest';
@@ -408,6 +410,178 @@ const _psu: Expect<Equal<typeof psu, Result<any, any>>> = true;
 // rejects a non-Result initial value
 // @ts-expect-error pipeSync.untyped requires a Result initial
 pipeSync.untyped(42, pipeMap);
+
+/* ---------------------------------------------------------------- */
+/* flow / flowSync: reusable data-last pipelines (deferred E)       */
+/* ---------------------------------------------------------------- */
+
+const stepF = (s: string): Result<boolean, E2> => success(s.length > 0);
+const flowPipe = flow(
+  map((n: number) => String(n)),
+  chain(stepF)
+);
+
+// the applied function returns a Promise (un-awaited, so the wrapper is pinned)
+const p1 = flowPipe(resultE1);
+const _p1: Expect<Equal<typeof p1, Promise<Result<boolean, E1 | E2>>>> = true;
+const p2 = flowPipe(resultE2);
+const _p2: Expect<Equal<typeof p2, Promise<Result<boolean, E2>>>> = true;
+void p1;
+void p2;
+void _p1;
+void _p2;
+
+// deferred input E: one flow applied to two different error channels;
+// each output keeps its own exact union (guards the silent-unknown collapse)
+async function flowDeferred(): Promise<void> {
+  const o1 = await flowPipe(resultE1);
+  const _o1: Expect<Equal<typeof o1, Result<boolean, E1 | E2>>> = true;
+  const o2 = await flowPipe(resultE2);
+  const _o2: Expect<Equal<typeof o2, Result<boolean, E2>>> = true;
+  void _o1;
+  void _o2;
+}
+
+// flow accepts Promise-returning ops; the applied result is Promise<Result<...>>
+const flowAsyncOp = flow((r: Result<number, unknown>) =>
+  Promise.resolve(success<string, ParseError>(String(r.success ? r.data : 0)))
+);
+async function flowAsyncProbe(): Promise<void> {
+  const p = flowAsyncOp(resultE1);
+  const _p: Expect<Equal<typeof p, Promise<Result<string, ParseError>>>> = true;
+  const o = await flowAsyncOp(resultE1);
+  const _o: Expect<Equal<typeof o, Result<string, ParseError>>> = true;
+  void p;
+  void _p;
+  void _o;
+}
+
+// flowSync returns the Result directly (not a Promise), E still deferred
+const flowSyncPipe = flowSync(
+  map((n: number) => String(n)),
+  chain(stepF)
+);
+const fs1 = flowSyncPipe(resultE1);
+const _fs1: Expect<Equal<typeof fs1, Result<boolean, E1 | E2>>> = true;
+const fs2 = flowSyncPipe(resultE2);
+const _fs2: Expect<Equal<typeof fs2, Result<boolean, E2>>> = true;
+
+// flowSync rejects Promise-returning operations
+// @ts-expect-error flowSync rejects Promise-returning operations
+flowSync((r: Result<number, unknown>) => Promise.resolve(success(1)));
+
+// flowSync's returned function takes a Result, not a Promise<Result>
+const fsApply = flowSync(map((n: number) => String(n)));
+// @ts-expect-error flowSync's returned function rejects a Promise<Result>
+fsApply(Promise.resolve(resultE1));
+
+// adjacent-op channel mismatch: op2 expects number, op1 yields string (both)
+// the diagnostic lands on op1, whose return can't satisfy the pinned slot
+flow(
+  // @ts-expect-error op2 expects Result<number, E>, so op1 must yield number
+  map((n: number) => String(n)),
+  map((n: number) => n + 1)
+);
+flowSync(
+  // @ts-expect-error op2 expects Result<number, E>, so op1 must yield number
+  map((n: number) => String(n)),
+  map((n: number) => n + 1)
+);
+
+// a narrow-input-E op (mapError pinning E) is rejected; the diagnostic lands
+// on the EARLIER op (op1), whose open E can't match the pinned slot
+flow(
+  // @ts-expect-error narrow mapError fixes E to 'x'; op1's open E can't match
+  map((n: number) => String(n)),
+  mapError((e: 'x') => e.length)
+);
+flowSync(
+  // @ts-expect-error narrow mapError fixes E to 'x'; op1's open E can't match
+  map((n: number) => String(n)),
+  mapError((e: 'x') => e.length)
+);
+
+// spread arrays are rejected; compose runtime-built arrays via pipe.untyped
+const runtimeOps = [map((n: number) => n + 1), map((n: number) => n * 2)];
+// @ts-expect-error flow rejects a spread array
+flow(...runtimeOps);
+// @ts-expect-error flowSync rejects a spread array
+flowSync(...runtimeOps);
+
+// partial explicit type args resolve against the 0-arg flow<T, E>() overload
+// @ts-expect-error flow<T, E>(...) is unsupported; annotate the first op's callback instead
+flow<number, E1>(map((n: number) => n));
+
+// 10-op boundary keeps types; 11+ falls back to the catch-all
+async function flowBoundary(): Promise<void> {
+  const f10 = flow(
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const f10out = await f10(start);
+  const _f10: Expect<Equal<typeof f10out, Result<number, E1>>> = true;
+
+  const f11 = flow(
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const f11out = await f11(start);
+  const _f11: Expect<Equal<typeof f11out, Result<any, any>>> = true;
+  void _f10;
+  void _f11;
+}
+
+function flowSyncBoundary(): void {
+  const fs10 = flowSync(
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const fs10out = fs10(start);
+  const _fs10: Expect<Equal<typeof fs10out, Result<number, E1>>> = true;
+
+  const fs11 = flowSync(
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap,
+    pipeMap
+  );
+  const fs11out = fs11(start);
+  const _fs11: Expect<Equal<typeof fs11out, Result<any, any>>> = true;
+  void _fs10;
+  void _fs11;
+}
 
 describe('type-level assertions', () => {
   it('compiles the type assertions (the real checks run under tsc)', () => {

@@ -19,6 +19,8 @@ import {
   getOrThrow,
   pipe,
   pipeSync,
+  flow,
+  flowSync,
   tap,
   tapError,
   type Result,
@@ -659,6 +661,109 @@ describe('Composition', () => {
     const result = pipeSync.untyped(success<number, string>(5), ...ops);
     expect(result.success).toBe(true);
     expect(unwrapResult(result)).toBe(11);
+  });
+
+  it('[P21] flow composes mixed sync/async ops in order', async () => {
+    const processUser = flow(
+      map((x: number) => x * 2),
+      chain((x: number) => success<string, string>(`n=${x}`)),
+      async (r: Result<string, unknown>) =>
+        r.success ? success(`${r.data}!`) : r
+    );
+    const a = await processUser(success<number, string>(5));
+    expect(unwrapResult(a)).toBe('n=10!');
+    const b = await processUser(success<number, string>(7));
+    expect(unwrapResult(b)).toBe('n=14!');
+  });
+
+  it('[P22] flow failure: every op runs; map no-op', async () => {
+    const successEffects: number[] = [];
+    const errorEffects: string[] = [];
+    const result = await flow(
+      map((x: number) => {
+        successEffects.push(x);
+        return x;
+      }),
+      tap((x: number) => {
+        successEffects.push(x);
+      }),
+      tapError((e: unknown) => {
+        errorEffects.push(String(e));
+      }),
+      mapError((e: unknown) => String(e).toUpperCase()),
+      tapError((e: string) => {
+        errorEffects.push(e);
+      })
+    )(failure<number, string>('initial error'));
+    expect(successEffects).toEqual([]);
+    expect(errorEffects).toEqual(['initial error', 'INITIAL ERROR']);
+    expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
+    expect(result.error).toBe('INITIAL ERROR');
+  });
+
+  it('[P23] flow with zero ops returns the initial result unchanged', async () => {
+    const initial = success<number, string>(42);
+    const result = await flow()(initial);
+    expect(result === initial).toBe(true);
+  });
+
+  it('[P24] flowSync composes all-sync ops in order, no Promise wrapper', () => {
+    const result = flowSync(
+      map((x: number) => x * 2),
+      map((x: number) => x + 1),
+      chain((x: number) => success<string, string>(`v=${x}`))
+    )(success<number, string>(5));
+    expect(result.success).toBe(true);
+    expect(unwrapResult(result)).toBe('v=11');
+  });
+
+  it('[P25] flowSync failure path: every op runs; map no-op, error ops run', () => {
+    const successEffects: number[] = [];
+    const errorEffects: string[] = [];
+    const result = flowSync(
+      map((x: number) => {
+        successEffects.push(x);
+        return x;
+      }),
+      tap((x: number) => {
+        successEffects.push(x);
+      }),
+      tapError((e: unknown) => {
+        errorEffects.push(String(e));
+      }),
+      mapError((e: unknown) => String(e).toUpperCase()),
+      tapError((e: string) => {
+        errorEffects.push(e);
+      })
+    )(failure<number, string>('initial error'));
+    expect(successEffects).toEqual([]);
+    expect(errorEffects).toEqual(['initial error', 'INITIAL ERROR']);
+    expect(result.success).toBe(false);
+    if (!isFailure(result)) return;
+    expect(result.error).toBe('INITIAL ERROR');
+  });
+
+  it('[P26] flow applies its pipeline to a Promise<Result> input', async () => {
+    const process = flow(
+      map((x: number) => x + 1),
+      chain((x: number) => success<string, string>(`n=${x}`))
+    );
+    const result = await process(Promise.resolve(success<number, string>(4)));
+    expect(result.success).toBe(true);
+    expect(unwrapResult(result)).toBe('n=5');
+    const failed = await process(
+      Promise.resolve(failure<number, string>('early'))
+    );
+    expect(failed.success).toBe(false);
+    if (!isFailure(failed)) return;
+    expect(failed.error).toBe('early');
+  });
+
+  it('[P27] flowSync with zero ops returns the initial result unchanged', () => {
+    const initial = success<number, string>(42);
+    const result = flowSync()(initial);
+    expect(result === initial).toBe(true);
   });
 });
 

@@ -898,6 +898,418 @@ namespace pipeSync {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/**
+ * Composes Result operations into a reusable unary function applied to data
+ * later. Like `pipe`, steps may return `Result` or `Promise<Result>` and are
+ * awaited per step; unlike `pipe`, no initial value exists at definition time,
+ * so the input error type stays generic until the returned function is applied.
+ * Ops need not be curried combinators: any unary Result-to-Result function
+ * works. Because input is deferred, a hand-written op's input error annotation
+ * must be permissive (`unknown` or generic); an op that narrows the incoming
+ * error is a compile error. Callbacks must be annotated at definition time.
+ * Typed through 10 operations; longer chains fall back to a catch-all returning
+ * `Promise<Result<any, any>>`. Prefer `flowSync` for all-synchronous pipelines
+ * that should not introduce a Promise.
+ * @template T - Input success type
+ * @template E - Input error type, deferred until application
+ * @param operations - Operations that transform Results (sync or async)
+ * @returns Unary function applying the pipeline to a Result or Promise<Result>
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function flow<T, E>(): (
+  initial: Result<T, E> | Promise<Result<T, E>>
+) => Promise<Result<T, E>>;
+function flow<T, E, T1, E1>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T1, E1>>;
+function flow<T, E, T1, E1, T2, E2>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T2, E2>>;
+function flow<T, E, T1, E1, T2, E2, T3, E3>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T3, E3>>;
+function flow<T, E, T1, E1, T2, E2, T3, E3, T4, E4>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T4, E4>>;
+function flow<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T5, E5>>;
+function flow<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T6, E6>>;
+function flow<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6, T7, E7>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T7, E7>>;
+function flow<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8> | Promise<Result<T8, E8>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T8, E8>>;
+function flow<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8> | Promise<Result<T8, E8>>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9> | Promise<Result<T9, E9>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T9, E9>>;
+function flow<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8> | Promise<Result<T8, E8>>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9> | Promise<Result<T9, E9>>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10> | Promise<Result<T10, E10>>
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<T10, E10>>;
+// Catch-all reachable only with chains of 11+ operations: it repeats
+// overload-10's precise parameters (so the first 10 ops are still checked and
+// a mismatch among them is a compile error), then requires at least one
+// additional, permissively typed operation via the non-empty tuple rest.
+function flow<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1> | Promise<Result<T1, E1>>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2> | Promise<Result<T2, E2>>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3> | Promise<Result<T3, E3>>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4> | Promise<Result<T4, E4>>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5> | Promise<Result<T5, E5>>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6> | Promise<Result<T6, E6>>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7> | Promise<Result<T7, E7>>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8> | Promise<Result<T8, E8>>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9> | Promise<Result<T9, E9>>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10> | Promise<Result<T10, E10>>,
+  ...rest: [PipeFallbackOp, ...PipeFallbackOp[]]
+): (initial: Result<T, E> | Promise<Result<T, E>>) => Promise<Result<any, any>>;
+
+function flow<T, E>(
+  ...operations: Array<
+    (result: Result<any, any>) => Result<any, any> | Promise<Result<any, any>>
+  >
+): (
+  initial: Result<T, E> | Promise<Result<T, E>>
+) => Promise<Result<any, any>> {
+  return initial => pipe.untyped(initial, ...operations);
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Synchronous twin of `flow`: composes Result operations into a reusable unary
+ * function applied to data later, returning the final `Result` directly with no
+ * Promise wrapper. Ops have the shape `(r: Result<T, E>) => Result<U, F>` and
+ * must be synchronous — Promise-returning ops are a compile error, as is
+ * passing a `Promise<Result>` to the returned function. The input error type
+ * stays generic until application. Typed through 10 operations; longer chains
+ * fall back to a catch-all returning `Result<any, any>`.
+ * @template T - Input success type
+ * @template E - Input error type, deferred until application
+ * @param operations - Operations that transform Results (sync only)
+ * @returns A unary function applying the pipeline to a Result
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function flowSync<T, E>(): (initial: Result<T, E>) => Result<T, E>;
+function flowSync<T, E, T1, E1>(
+  op1: (r: Result<T, E>) => Result<T1, E1>
+): (initial: Result<T, E>) => Result<T1, E1>;
+function flowSync<T, E, T1, E1, T2, E2>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>
+): (initial: Result<T, E>) => Result<T2, E2>;
+function flowSync<T, E, T1, E1, T2, E2, T3, E3>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>
+): (initial: Result<T, E>) => Result<T3, E3>;
+function flowSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>
+): (initial: Result<T, E>) => Result<T4, E4>;
+function flowSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>
+): (initial: Result<T, E>) => Result<T5, E5>;
+function flowSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>
+): (initial: Result<T, E>) => Result<T6, E6>;
+function flowSync<T, E, T1, E1, T2, E2, T3, E3, T4, E4, T5, E5, T6, E6, T7, E7>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>
+): (initial: Result<T, E>) => Result<T7, E7>;
+function flowSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>
+): (initial: Result<T, E>) => Result<T8, E8>;
+function flowSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>
+): (initial: Result<T, E>) => Result<T9, E9>;
+function flowSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10>
+): (initial: Result<T, E>) => Result<T10, E10>;
+// Catch-all reachable only with chains of 11+ operations: it repeats
+// overload-10's precise parameters (so the first 10 ops are still checked and
+// a mismatch among them is a compile error), then requires at least one
+// additional, permissively typed operation via the non-empty tuple rest.
+function flowSync<
+  T,
+  E,
+  T1,
+  E1,
+  T2,
+  E2,
+  T3,
+  E3,
+  T4,
+  E4,
+  T5,
+  E5,
+  T6,
+  E6,
+  T7,
+  E7,
+  T8,
+  E8,
+  T9,
+  E9,
+  T10,
+  E10,
+>(
+  op1: (r: Result<T, E>) => Result<T1, E1>,
+  op2: (r: Result<T1, E1>) => Result<T2, E2>,
+  op3: (r: Result<T2, E2>) => Result<T3, E3>,
+  op4: (r: Result<T3, E3>) => Result<T4, E4>,
+  op5: (r: Result<T4, E4>) => Result<T5, E5>,
+  op6: (r: Result<T5, E5>) => Result<T6, E6>,
+  op7: (r: Result<T6, E6>) => Result<T7, E7>,
+  op8: (r: Result<T7, E7>) => Result<T8, E8>,
+  op9: (r: Result<T8, E8>) => Result<T9, E9>,
+  op10: (r: Result<T9, E9>) => Result<T10, E10>,
+  ...rest: [PipeSyncFallbackOp, ...PipeSyncFallbackOp[]]
+): (initial: Result<T, E>) => Result<any, any>;
+
+function flowSync<T, E>(
+  ...operations: Array<(result: Result<any, any>) => Result<any, any>>
+): (initial: Result<T, E>) => Result<any, any> {
+  return initial => pipeSync.untyped(initial, ...operations);
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // Export everything
 export type { Result, ValidationError };
 export {
@@ -923,4 +1335,6 @@ export {
   unwrapResult,
   pipe,
   pipeSync,
+  flow,
+  flowSync,
 };

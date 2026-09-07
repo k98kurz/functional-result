@@ -4,8 +4,9 @@ description: >
   Functional error handling with the Result type. Use when you need to chain
   operations that may fail, collect validation errors, convert exception-based
   code to explicit error handling, or work with typed success/failure paths in
-  TypeScript. Provides map, chain, pipe, tryCatch, tryCatchSync, validate,
-  sequence, traverse, tap, tapError, and match/fold for composable error handling.
+  TypeScript. Provides map, chain, pipe, pipeSync, flow, tryCatch, tryCatchSync,
+  validate, sequence, traverse, tap, tapError, and match/fold for composable
+  error handling.
 license: ISC
 compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
@@ -164,6 +165,83 @@ const result = processInput('21'); // { success: true, data: 21 }
 The curried combinators compose directly as the underlying primitive, but
 `pipeSync` keeps the same flat, left-to-right DX as `pipe` without forcing
 `async`/`await` into an all-sync chain.
+
+### Composing reusable pipelines with flow / flowSync
+
+`pipe` and `pipeSync` are data-first: the initial value seeds type inference at
+the call site. To define a pipeline once and apply it to data that arrives
+later, use `flow` (async or mixed steps, returns a `Promise`) or `flowSync`
+(sync steps only, returns the `Result` directly). Their input error type stays
+generic until the returned function is applied:
+
+<!-- example: flow-composition -->
+```typescript
+import {
+  chain,
+  failure,
+  flow,
+  map,
+  success,
+} from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+type User = { id: number; email: string };
+type ApiError = { code: string; message: string };
+
+const sendEmail = (email: string): Result<boolean, ApiError> =>
+  email.includes('@')
+    ? success(true)
+    : failure({ code: 'email', message: 'invalid email' });
+
+const processUser = flow(
+  map((u: User) => u.email),
+  chain(sendEmail),
+  async <E>(r: Result<boolean, E>) =>
+    r.success ? success('sent') : r
+);
+
+const userA = success({ id: 1, email: 'a@example.com' } as User);
+const userB = success({ id: 2, email: 'no-at.example.com' } as User);
+
+const a = await processUser(userA); // { success: true, data: 'sent' }
+const b = await processUser(userB);
+// { success: false, error: { code: 'email', message: 'invalid email' } }
+```
+
+Since no data is in scope at definition time, annotate callbacks there and keep
+a hand-written op's input error annotation permissive (`unknown` or generic);
+prefer a generic `<E>` on ops that pass failures through unchanged, since
+`unknown` widens that op's output error channel to `unknown`. An op that
+narrows the incoming error belongs per-application. For an all-sync pipeline
+that should not introduce a `Promise`, use `flowSync`:
+
+<!-- example: flow-sync-composition -->
+```typescript
+import {
+  chain,
+  failure,
+  flowSync,
+  map,
+  success,
+} from '@k98kurz/functional-result';
+import type { Result } from '@k98kurz/functional-result';
+
+type Input = { value: number };
+type ApiError = { code: string; message: string };
+
+const checkRange = (n: number): Result<number, ApiError> =>
+  n > 100
+    ? failure({ code: 'range', message: `${n} is out of range` })
+    : success(n);
+
+const processInput = flowSync(
+  map((i: Input) => i.value),
+  chain(checkRange)
+);
+
+const resultA = processInput(success({ value: 42 } as Input));
+const resultB = processInput(success({ value: 200 } as Input));
+```
 
 ### Side effects with tap and tapError
 
@@ -529,11 +607,13 @@ if (isFailure(result)) {
 
 - **Currying style**: Some functions are curried - call them as `fn(args)(result)`, not `fn(args, result)`
   - `map`, `mapError`, `chain`, `match`, `fold`, `traverse`, `validate`, `getOrElse`, `tap`, `tapError`
-- **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead. `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`)
+- **Annotate curried callbacks**: `traverse`, `match`, and `fold` handlers are typed at partial application, before the data is in scope — annotate parameters (`traverse((x: number) => ...)`) or they infer as `unknown`. `sequence(items.map(fn))` types the callback from the array instead. `match`/`fold` branches may return different types and infer as a union (e.g. `match(n => n, e => 'bad')` yields `number | 'bad'`). The same applies to `flow`/`flowSync`: annotate callbacks at definition time, since no data is in scope there either
 - **Sync composition**: `pipe` is async-only; for pure sync flows use `pipeSync` (returns the `Result` directly, no `Promise` wrapper). The curried combinators also compose directly without the `Promise` wrapper
 - **Async pipe**: The `pipe` function always returns a Promise, even for synchronous operations
 - **pipe op limit**: `pipe` provides typed inference through 10 operations. Longer chains compile via a fallback that types the result as `Promise<Result<any, any>>`; the first 10 operations are still type-checked (a mismatch among them is a compile error) and only operations beyond the tenth are unchecked. `pipeSync` mirrors the same 10-op boundary, falling back to `Result<any, any>`
-- **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array. For sync-only flows, `pipeSync.untyped` is the synchronous equivalent, returning `Result<any, any>`
+- **Dynamic composition**: to compose an array of operations built at runtime, use `pipe.untyped(start, ...fns)` — it accepts any number of operations with no step typing, returning `Promise<Result<any, any>>`; `pipe` itself rejects a spread array, as do `flow` and `flowSync`. For sync-only flows, `pipeSync.untyped` is the synchronous equivalent, returning `Result<any, any>`
+- **Reusable pipelines**: to define a pipeline once and apply it later, use `flow(...ops)` (mixed or async steps, returns a `Promise`) or `flowSync(...ops)` (sync only, returns the `Result` directly). Their input error type stays generic until application; both mirror the 10-op typed cutoff of `pipe`/`pipeSync`
+- **flow op annotations**: ops in a reusable flow need permissive input-error annotations — `unknown` on a pass-through op silently widens its output error channel to `unknown`, so prefer a generic `<E>`; a `mapError((e: SomeLiteral) => ...)` narrows `E` and belongs per-application; partial explicit type args are unsupported (`flow<User, E>(...)` is a compile error) — annotate the first op's callback instead
 - **tryCatch vs tryCatchSync**: Use `tryCatch` for async or unknown operations; use `tryCatchSync` for sync-only to avoid Promise overhead
 - **Type inference**: Specify error types explicitly when needed: `Result<string, ApiError>`
 - **Validation error format**: `validate` requires `ValidationError` interface: `{ field: string; message: string }`

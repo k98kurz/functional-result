@@ -29,6 +29,17 @@
   `pipeSync.untyped(start, ...ops)`). It performs no step-by-step typing,
   returning `Result<any, any>`, while still validating that the initial value is
   a Result
+- Added `flow(...operations)` for reusable pipeline composition: it composes
+  Result operations into a unary function applied to data later
+  (`flow(map(f), chain(g))(result)`), mixing sync and async steps like `pipe`.
+  The input error type stays generic until the returned function is applied, so
+  one flow works across Results with different error types. Typed through 10
+  operations with the same fallback as `pipe`
+- Added `flowSync(...operations)` — the synchronous twin of `flow`: sync ops
+  only, returning the final `Result` directly with no `Promise` wrapper.
+  Promise-returning operations and a `Promise<Result>` passed to the returned
+  function are compile errors. Typed through 10 operations, then a fallback
+  overload types longer chains as `Result<any, any>`
 - Fixed `tryCatch` type inference: promise-returning thunks now bind `T` to the
   awaited value instead of `Promise<T>` (type-level fix, runtime unchanged)
 - Fixed curried generics for `chain`, `map`, and `tap`: the error type is no

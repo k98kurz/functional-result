@@ -221,6 +221,31 @@ the array as `Result<T, E1 | E2>[]`, or build it via `items.map(fn)` /
 `traverse`). Pin both behaviors with type-level `Equal`/`Expect` assertions
 and `@ts-expect-error` guards in `test/`.
 
+**Flow slot shape (2026-09-05, extends the entry above):** `flow`/`flowSync`
+defer their input error `E` until application by mirroring `pipe`/`pipeSync`
+ladders minus `initial`, with NON-generic op slots whose error positions are
+bare flow-level inference variables — `(r: Result<T, E>) => Result<T1, E1> |
+Promise<Result<T1, E1>>`. A curried op's generic `E` unifies with the slot
+variable and stays symbolic, so the returned function comes out generic in
+`E` (deferred input for free, same phenomenon as stored `chain(step)` partials).
+Anti-pattern (probe-verified, TS 5.9): do NOT "improve" the slots into generic
+ones with named error introductions — `<E>(r: Result<T, E>) => Result<T1, E | F1>`
+compiles and accepts `map`/`chain`, but TS will not decompose a source union
+against a union inference target, so `F1` silently defaults to `unknown` and the
+output error collapses to `Result<_, unknown>` with NO compile error (runtime
+tests cannot catch it). Rule: unions may appear in source (argument) positions
+only, never in an inference-target position. Consequences: a hand-written op's
+input error annotation must be permissive (`unknown` or generic) — an op that
+narrows the incoming error (`mapError((e: 'x') => ...)`) is a compile error, and
+the diagnostic often lands on an EARLIER op (inference fixes the step's error
+from the narrowing op first, then the previous op's return mismatches). Partial
+explicit type args are unsupported — `flow<User, E>(op)` resolves against the
+0-arg `flow<T, E>()` overload (the only 2-type-param candidate) and fails with
+TS2554 "Expected 0 arguments, but got 1"; annotate the first permissive op
+instead. Of the two permissive annotations, prefer
+generic on pass-through ops: `unknown` widens that op's output error channel
+to `unknown`, while a generic `<E>` preserves the accumulated union.
+
 ## pipe overload ordering: typed-first, catch-all-last
 
 **Decision (2026-09-04, revised):** Fixed-arity typed overloads FIRST (0..10
