@@ -34,6 +34,8 @@ a historical record of churn.
 for updating versions of the library. This is NOT a graveyard for maintainer code
 churn entries. No internal/maintainer-relevant information should be preserved here.
 The format should be easy to scan and read for consumers of this library.
+Do NOT record changes to intermediate states in the change log. ONLY record things
+that ACTUALLY CHANGE BETWEEN RELEASES in the changelog.
 
 # Discovery of Development Practices
 

@@ -34,7 +34,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"examples/**/*.ts\" && node scripts/check-jsdoc-lines.mjs",
     "check:jsdoc": "node scripts/check-jsdoc-lines.mjs",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.examples.json",
     "typecheck:src": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck:examples": "tsc -p tsconfig.examples.json",
