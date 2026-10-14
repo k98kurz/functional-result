@@ -731,10 +731,10 @@ npx export-functional-result-skill [platform]
 
 Available platforms:
 - `claude` - Export to `.claude/skills/functional-result/SKILL.md`
-- `codex` - Export to `.agent/skills/functional-result/SKILL.md`
+- `codex` - Export to `.agents/skills/functional-result/SKILL.md`
 - `cursor` - Export to `.cursor/skills/functional-result/SKILL.md`
 - `opencode` - Export to `.opencode/skills/functional-result/SKILL.md`
-- `default` - Export to `.agent/skills/functional-result/SKILL.md` (default)
+- `default` - Export to `.agents/skills/functional-result/SKILL.md` (default)
 
 ### Examples
 

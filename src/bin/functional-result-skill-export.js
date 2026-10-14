@@ -7,12 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const platformPaths = {
   claude: '.claude/skills/functional-result/',
-  codex: '.agent/skills/functional-result/',
+  codex: '.agents/skills/functional-result/',
   cursor: '.cursor/skills/functional-result/',
   opencode: '.opencode/skills/functional-result/',
 };
 
-const defaultPath = '.agent/skills/functional-result/';
+const defaultPath = '.agents/skills/functional-result/';
 
 export function getSourcePath() {
   return path.join(__dirname, '..', 'SKILL.md');
@@ -58,11 +58,11 @@ export function printHelp() {
   console.log('');
   console.log('Platforms:');
   console.log('  claude   - Export to .claude/skills/functional-result/');
-  console.log('  codex    - Export to .agent/skills/functional-result/');
+  console.log('  codex    - Export to .agents/skills/functional-result/');
   console.log('  cursor   - Export to .cursor/skills/functional-result/');
   console.log('  opencode - Export to .opencode/skills/functional-result/');
   console.log(
-    '  default  - Export to .agent/skills/functional-result/ (default)'
+    '  default  - Export to .agents/skills/functional-result/ (default)'
   );
 }
 

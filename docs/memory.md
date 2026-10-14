@@ -283,3 +283,18 @@ config).
 - `/* eslint-disable */` comments before an elided overload are dropped from
   emitted JS (harmless) — verify runtime parity by diffing comment-stripped
   JS rather than chasing byte-identical emit.
+
+## Codex reads `.agents/skills/`, not `.agent/skills/`
+
+**Gotcha (2026-10-14):** The skill-export CLI targeted `.agent/skills/` for the
+`codex` and `default` platforms. Codex only discovers skills under the PLURAL
+`.agents/skills/`; the singular directory is silently ignored, so the export
+appeared to succeed while Codex never loaded the skill. The typo survived
+because the export tests asserted the wrong literal (they only pinned the bug,
+never the platform contract) and no Codex instance was exercised.
+
+**Solution:** Platform skill directories are `.<tool>/skills/` for tools whose
+name is the directory (`.claude`, `.cursor`, `.opencode`) but Codex is the
+exception: `.agents/skills/` (plural). When adding or changing a platform path,
+verify against the target tool's actual discovery directory, not against the
+sibling conventions — and update the tests' expected literals at the same time.

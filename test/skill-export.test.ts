@@ -19,7 +19,7 @@ describe('Skill Export', () => {
   describe('getTargetPath', () => {
     it('[S01] returns correct path for each known platform', () => {
       expect(getTargetPath('claude')).toBe('.claude/skills/functional-result/');
-      expect(getTargetPath('codex')).toBe('.agent/skills/functional-result/');
+      expect(getTargetPath('codex')).toBe('.agents/skills/functional-result/');
       expect(getTargetPath('cursor')).toBe('.cursor/skills/functional-result/');
       expect(getTargetPath('opencode')).toBe(
         '.opencode/skills/functional-result/'
@@ -27,7 +27,9 @@ describe('Skill Export', () => {
     });
 
     it('[S02] returns default path for unknown platform', () => {
-      expect(getTargetPath('unknown')).toBe('.agent/skills/functional-result/');
+      expect(getTargetPath('unknown')).toBe(
+        '.agents/skills/functional-result/'
+      );
     });
   });
 

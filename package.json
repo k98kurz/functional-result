@@ -1,6 +1,6 @@
 {
   "name": "@k98kurz/functional-result",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "TypeScript library for handling Results and chaining operations.",
   "main": "dist/functional-result.js",
   "type": "module",
@@ -22,9 +22,10 @@
     "readme.md"
   ],
   "scripts": {
-    "build": "npm run build:clean && npm run build:core && npm run build:assets",
+    "build": "npm run build:clean && npm run build:core && npm run build:minify && npm run build:assets",
     "build:clean": "rm -rf dist",
     "build:core": "tsc -p tsconfig.core.json",
+    "build:minify": "node scripts/minify.mjs",
     "build:assets": "mkdir -p dist/bin && cp src/bin/functional-result-skill-export.js dist/bin/ && chmod +x dist/bin/functional-result-skill-export.js && cp src/SKILL.md dist/ && mkdir -p dist/references && cp src/references/*.md dist/references/ && node scripts/extract-changelog.mjs",
     "dev": "npm run build:core -- --watch",
     "export:functional-result": "node dist/bin/functional-result-skill-export.js",
@@ -50,7 +51,7 @@
     "type": "git",
     "url": "git+https://github.com/k98kurz/functional-result.git"
   },
-  "homepage": "https://github.com/k98kurz/functional-result#readme",
+  "homepage": "https://pycelium.com/",
   "bugs": {
     "url": "https://github.com/k98kurz/functional-result/issues"
   },
@@ -80,6 +81,7 @@
     "@eslint/js": "^9.0.0",
     "@types/node": "^20.11.28",
     "@vitest/coverage-v8": "^3.2.6",
+    "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "prettier": "^3.5.0",
     "typescript": "^5.7.0",

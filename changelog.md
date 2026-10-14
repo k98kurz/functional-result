@@ -1,3 +1,10 @@
+## 0.0.5
+
+- Added minification to build to reduce bundle size:
+  - Unzipped: 13,613 bytes -> 1853 bytes
+  - Gzipped: 3,151 bytes -> 787 bytes
+- Corrected the Codex/default skill export path from `.agent/` to `.agents/`
+
 ## 0.0.4
 
 - Breaking: explicit type arguments on curried `mapError`, `tapError`, and

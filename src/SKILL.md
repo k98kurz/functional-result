@@ -12,8 +12,8 @@ compatibility: >
   Designed for TypeScript projects. Exported to Claude Code, Cursor, OpenCode,
   and Codex agent platforms via @k98kurz/functional-result.
 metadata:
-  version: "0.0.4"
-  last-updated: "2026-09-07"
+  version: "0.0.5"
+  last-updated: "2026-10-14"
   author: "Jonathan Voss"
   library-name: "@k98kurz/functional-result"
   repository: "https://github.com/k98kurz/functional-result"
